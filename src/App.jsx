@@ -1002,6 +1002,27 @@ export default function App(){
       </select>
       <button onClick={()=>setShowEnv(true)} style={{fontSize:11,padding:'5px 12px',borderRadius:7,border:`1px solid rgba(124,106,247,0.25)`,background:'rgba(124,106,247,0.06)',color:C.pu,cursor:'pointer',fontFamily:'inherit'}}>⚙ Environments</button>
       <button onClick={()=>setShowHist(true)} style={{fontSize:11,padding:'5px 12px',borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',cursor:'pointer',fontFamily:'inherit'}}>🕐 History</button>
+      <button onClick={()=>{
+        const data={collections,history,envs,exportedAt:new Date().toISOString()}
+        const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+        const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='apiforge-backup.json';a.click()
+      }} style={{fontSize:11,padding:'5px 11px',borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',cursor:'pointer',fontFamily:'inherit'}}>↓ Export</button>
+      <label style={{fontSize:11,padding:'5px 11px',borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',cursor:'pointer',fontFamily:'inherit',display:'inline-flex',alignItems:'center'}}>
+        ↑ Import
+        <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{
+          const file=e.target.files?.[0];if(!file)return
+          const reader=new FileReader()
+          reader.onload=ev=>{
+            try{
+              const d=JSON.parse(ev.target.result)
+              if(d.collections) setCollections(d.collections)
+              if(d.history)     setHistory(d.history)
+              if(d.envs)        setEnvs(d.envs)
+            }catch{ alert('Invalid backup file') }
+          }
+          reader.readAsText(file);e.target.value=''
+        }}/>
+      </label>
       <button onClick={()=>setShowBackend(true)} style={{
           fontSize:11,padding:'5px 12px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,
           border: backendOk===true?'1px solid rgba(22,163,74,0.3)':backendOk===false?'1px solid rgba(220,38,38,0.3)':'1px solid rgba(124,106,247,0.25)',
