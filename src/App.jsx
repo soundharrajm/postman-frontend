@@ -243,7 +243,7 @@ function ResponseViewer({response,loading,elapsed}){
 }
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
-function Sidebar({collections,activeId,onSelect,onNew,onNewCollection,onDeleteRequest,onRenameCollection,onDeleteCollection,onImport,onRun}){
+function Sidebar({collections,activeId,onSelect,onNew,onNewCollection,onDeleteRequest,onRenameCollection,onDeleteCollection,onImport,onRun,onExport}){
   const[exp,setExp]=useState({})
   const[editCol,setEditCol]=useState(null)
   const[colName,setColName]=useState('')
@@ -267,8 +267,9 @@ function Sidebar({collections,activeId,onSelect,onNew,onNewCollection,onDeleteRe
               :<span onClick={()=>tog(col.id)} style={{flex:1,fontSize:12,fontWeight:600,color:'#1a1a2e',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{col.name}</span>
             }
             <div style={{display:'flex',gap:3}}>
-              <button onClick={()=>onRun(col.id)} title="Run" style={{width:20,height:20,border:'none',background:'none',color:C.green,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▶</button>
-              <button onClick={()=>onNew(col.id)} title="Add" style={{width:20,height:20,border:'none',background:'none',color:'#94a3b8',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+              <button onClick={()=>onRun(col.id)} title="Run collection" style={{width:20,height:20,border:'none',background:'none',color:C.green,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>▶</button>
+              <button onClick={()=>onExport(col)} title="Export as JSON" style={{width:20,height:20,border:'none',background:'none',color:'#94a3b8',fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>↓</button>
+              <button onClick={()=>onNew(col.id)} title="Add request" style={{width:20,height:20,border:'none',background:'none',color:'#94a3b8',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
               <button onClick={()=>onDeleteCollection(col.id)} title="Delete" style={{width:20,height:20,border:'none',background:'none',color:'#94a3b8',fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>🗑</button>
             </div>
           </div>
@@ -1025,6 +1026,27 @@ export default function App(){
         onDeleteCollection={(id)=>setCollections(cs=>cs.filter(c=>c.id!==id))}
         onImport={()=>importRef.current?.click()}
         onRun={(id)=>setRunnerCol(collections.find(c=>c.id===id))}
+        onExport={(col)=>{
+          // Export as Postman v2.1 compatible JSON
+          const postman = {
+            info: { name: col.name, schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+            item: col.requests.map(req => ({
+              name: req.name,
+              request: {
+                method: req.method,
+                url:    { raw: req.url },
+                header: req.headers.filter(h=>h.enabled&&h.key).map(h=>({key:h.key,value:h.value})),
+                body:   req.body ? { mode:'raw', raw:req.body } : undefined,
+              }
+            })),
+            variable: Object.entries(col.vars||{}).map(([key,value])=>({key,value}))
+          }
+          const blob = new Blob([JSON.stringify(postman,null,2)],{type:'application/json'})
+          const a = document.createElement('a')
+          a.href = URL.createObjectURL(blob)
+          a.download = col.name.replace(/\s+/g,'_')+'.json'
+          a.click()
+        }}
       />
       {activeReq?(
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
