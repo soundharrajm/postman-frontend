@@ -386,6 +386,19 @@ function HistoryPanel({history,onSelect,onClose}){
   </div>)
 }
 
+// ── parseCSV — parse CSV string into array of {col:val} objects ──────────────
+function parseCSV(text){
+  const lines=text.trim().split(/\r?\n/).filter(Boolean)
+  if(lines.length<2)return[]
+  const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''))
+  return lines.slice(1).map(line=>{
+    const vals=line.match(/(".*?"|[^,]+|(?<=,)(?=,)|^(?=,)|(?<=,)$)/g)||[]
+    const row={}
+    headers.forEach((h,i)=>{row[h]=(vals[i]||'').trim().replace(/^"|"$/g,'')})
+    return row
+  })
+}
+
 // ── CollectionRunner ─────────────────────────────────────────────────────────
 function CollectionRunner({collection,envVars,onClose}){
   const[iterations,setIterations]=useState(1)
@@ -393,16 +406,48 @@ function CollectionRunner({collection,envVars,onClose}){
   const[running,setRunning]=useState(false)
   const[results,setResults]=useState([])
   const[current,setCurrent]=useState(null)
+  const[csvRows,setCsvRows]=useState([])     // parsed CSV data rows
+  const[csvHeaders,setCsvHeaders]=useState([]) // CSV column names
+  const[csvFile,setCsvFile]=useState(null)
   const abortRef=useRef(false)
+  const csvRef=useRef(null)
   const colVars=collection.vars||{}
-  const resolve=(s)=>s.replace(/\{\{(\w+)\}\}/g,(_,k)=>colVars[k]??envVars[k]??`{{${k}}}`)
+
+  // Auto-detect all {{vars}} used across all requests in this collection
+  const apiVars=[...new Set(
+    collection.requests.flatMap(req=>{
+      const allText=[req.url,req.body||'',...(req.headers||[]).map(h=>h.key+' '+h.value),...(req.params||[]).map(p=>p.key+' '+p.value)].join(' ')
+      return [...allText.matchAll(/\{\{(\w+)\}\}/g)].map(m=>m[1])
+    })
+  )]
+
+  // Resolve vars — CSV row vars > collection vars > env vars
+  const resolveWith=(s,rowVars={})=>s.replace(/\{\{(\w+)\}\}/g,(_,k)=>rowVars[k]??colVars[k]??envVars[k]??`{{${k}}}`)
+
+  // When CSV loaded, set iterations to row count
+  const handleCSV=(e)=>{
+    const file=e.target.files?.[0];if(!file)return
+    setCsvFile(file.name)
+    const reader=new FileReader()
+    reader.onload=(ev)=>{
+      const rows=parseCSV(ev.target.result)
+      setCsvRows(rows)
+      setCsvHeaders(rows.length?Object.keys(rows[0]):[])
+      setIterations(rows.length||1)
+    }
+    reader.readAsText(file)
+    e.target.value=''
+  }
 
   const runAll=async()=>{
     setRunning(true);setResults([]);abortRef.current=false
     const all=[]
-    for(let iter=1;iter<=iterations;iter++){
+    const totalIter=csvRows.length>0?csvRows.length:iterations
+    for(let iter=1;iter<=totalIter;iter++){
       if(abortRef.current)break
-      const ir={iter,requests:[]}
+      // Merge CSV row vars for this iteration
+      const rowVars=csvRows.length>0?csvRows[iter-1]:{}
+      const ir={iter,requests:[],rowVars}
       for(let ri=0;ri<collection.requests.length;ri++){
         if(abortRef.current)break
         const req=collection.requests[ri]
@@ -410,18 +455,18 @@ function CollectionRunner({collection,envVars,onClose}){
         const t0=Date.now()
         let status=0,statusText='',passed=false,error=null
         try{
-          let url=resolve(req.url)
+          let url=resolveWith(req.url,rowVars)
           const en=(req.params||[]).filter(p=>p.enabled&&p.key)
-          if(en.length){const qs=en.map(p=>`${encodeURIComponent(p.key)}=${encodeURIComponent(resolve(p.value))}`).join('&');url=`${url}${url.includes('?')?'&':'?'}${qs}`}
+          if(en.length){const qs=en.map(p=>`${encodeURIComponent(p.key)}=${encodeURIComponent(resolveWith(p.value,rowVars))}`).join('&');url=`${url}${url.includes('?')?'&':'?'}${qs}`}
           const hdrs={}
-          ;(req.headers||[]).filter(h=>h.enabled&&h.key).forEach(h=>{hdrs[h.key]=resolve(h.value)})
+          ;(req.headers||[]).filter(h=>h.enabled&&h.key).forEach(h=>{hdrs[h.key]=resolveWith(h.value,rowVars)})
           const auth=req.auth||{}
-          if(auth.type==='bearer'&&auth.token)hdrs['Authorization']=`Bearer ${resolve(auth.token)}`
-          if(auth.type==='basic'&&auth.username)hdrs['Authorization']=`Basic ${btoa(`${auth.username}:${auth.password}`)}`
+          if(auth.type==='bearer'&&auth.token)hdrs['Authorization']='Bearer '+resolveWith(auth.token,rowVars)
+          if(auth.type==='basic'&&auth.username)hdrs['Authorization']='Basic '+btoa(auth.username+':'+auth.password)
           if(auth.type==='apikey'&&auth.key&&auth.in==='header')hdrs[auth.key]=auth.value
           let body=undefined
-          if(!['GET','HEAD'].includes(req.method)&&req.bodyType!=='none'&&req.body){hdrs['Content-Type']='application/json';body=req.body}
-          const r=await fetch(`${getApiUrl()}/proxy`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,method:req.method,headers:hdrs,body})})
+          if(!['GET','HEAD'].includes(req.method)&&req.bodyType!=='none'&&req.body){hdrs['Content-Type']='application/json';body=resolveWith(req.body,rowVars)}
+          const r=await fetch(getApiUrl()+'/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,method:req.method,headers:hdrs,body})})
           const d=await r.json()
           status=d.status;statusText=d.status_text
           passed=status>=200&&status<300
@@ -452,8 +497,47 @@ function CollectionRunner({collection,envVars,onClose}){
       </div>
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
         <div style={{width:220,borderRight:`1px solid ${C.border}`,padding:16,display:'flex',flexDirection:'column',gap:14,flexShrink:0}}>
-          <div><label style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>Iterations</label>
-            <input type="number" min={1} max={1000} value={iterations} onChange={e=>setIterations(Number(e.target.value))} style={{width:'100%',background:'#f8f8fc',border:`1.5px solid ${C.border}`,borderRadius:7,padding:'7px 10px',fontSize:13,color:'#1a1a2e',outline:'none',fontFamily:C.mono,boxSizing:'border-box'}}/></div>
+          {/* CSV Upload — auto-maps CSV columns to {{vars}} found in requests */}
+          <div>
+            <label style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>Data File (CSV)</label>
+            <input ref={csvRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleCSV}/>
+            <button onClick={()=>csvRef.current?.click()} style={{width:'100%',padding:'8px 10px',borderRadius:7,border:'1.5px dashed '+C.border,background:csvFile?'rgba(124,106,247,0.05)':'#f8f8fc',color:csvFile?C.pu:'#94a3b8',fontSize:11,cursor:'pointer',fontFamily:'inherit',textAlign:'left',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {csvFile?'📄 '+csvFile:'↑ Upload CSV — columns auto-map to {{vars}}'}
+            </button>
+
+            {/* Show auto-mapping: API vars → CSV columns */}
+            {csvHeaders.length>0&&(
+              <div style={{marginTop:8,padding:'8px 10px',background:'#f8f8fc',border:'1px solid '+C.border,borderRadius:8}}>
+                <div style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Auto-mapping</div>
+                {apiVars.length===0&&<div style={{fontSize:11,color:'#94a3b8'}}>No {'{{vars}}'} found in requests</div>}
+                {apiVars.map(v=>{
+                  const matched=csvHeaders.includes(v)
+                  return(
+                    <div key={v} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                      <span style={{fontFamily:C.mono,fontSize:11,color:C.pu,background:'rgba(124,106,247,0.08)',border:'1px solid rgba(124,106,247,0.2)',borderRadius:4,padding:'2px 7px',flexShrink:0}}>{'{{'+v+'}}'}</span>
+                      <span style={{fontSize:11,color:'#94a3b8'}}>→</span>
+                      {matched
+                        ?<span style={{fontFamily:C.mono,fontSize:11,color:'#16a34a',background:'rgba(22,163,74,0.08)',border:'1px solid rgba(22,163,74,0.2)',borderRadius:4,padding:'2px 7px'}}>✓ {v}</span>
+                        :<span style={{fontSize:11,color:'#ef4444'}}>⚠ no column "{v}" in CSV</span>
+                      }
+                    </div>
+                  )
+                })}
+                {csvHeaders.filter(h=>!apiVars.includes(h)).length>0&&(
+                  <div style={{marginTop:6,paddingTop:6,borderTop:'1px solid '+C.border,fontSize:10,color:'#94a3b8'}}>
+                    Unused CSV columns: {csvHeaders.filter(h=>!apiVars.includes(h)).map(h=><span key={h} style={{fontFamily:C.mono,color:'#cbd5e1',marginRight:4}}>{h}</span>)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {csvFile&&<button onClick={()=>{setCsvFile(null);setCsvRows([]);setCsvHeaders([]);setIterations(1)}} style={{marginTop:5,fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:0}}>✕ Remove CSV</button>}
+          </div>
+
+          <div><label style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>
+            Iterations {csvRows.length>0&&<span style={{color:C.pu,fontWeight:400,textTransform:'none'}}>({csvRows.length} from CSV)</span>}
+          </label>
+            <input type="number" min={1} max={1000} value={iterations} onChange={e=>setIterations(Number(e.target.value))} disabled={csvRows.length>0} style={{width:'100%',background:'#f8f8fc',border:'1.5px solid '+C.border,borderRadius:7,padding:'7px 10px',fontSize:13,color:csvRows.length>0?'#94a3b8':'#1a1a2e',outline:'none',fontFamily:C.mono,boxSizing:'border-box',cursor:csvRows.length>0?'not-allowed':'text'}}/></div>
           <div><label style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>Delay (ms)</label>
             <input type="number" min={0} max={10000} value={delay} onChange={e=>setDelay(Number(e.target.value))} style={{width:'100%',background:'#f8f8fc',border:`1.5px solid ${C.border}`,borderRadius:7,padding:'7px 10px',fontSize:13,color:'#1a1a2e',outline:'none',fontFamily:C.mono,boxSizing:'border-box'}}/></div>
           <div style={{flex:1}}>
@@ -485,7 +569,18 @@ function CollectionRunner({collection,envVars,onClose}){
           {results.length===0&&!running&&<div style={{textAlign:'center',padding:40,color:'#cbd5e1'}}><div style={{fontSize:40,marginBottom:12}}>▶</div><p style={{fontSize:13}}>Click Run All to start</p></div>}
           {results.map(iter=>(
             <div key={iter.iter} style={{marginBottom:14,border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden'}}>
-              <div style={{padding:'8px 14px',background:'#f8f8fc',borderBottom:`1px solid ${C.border}`,fontSize:12,fontWeight:600,color:'#64748b'}}>Iteration {iter.iter}</div>
+              <div style={{padding:'8px 14px',background:'#f8f8fc',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
+                <span style={{fontSize:12,fontWeight:600,color:'#64748b'}}>Iteration {iter.iter}</span>
+                {iter.rowVars&&Object.keys(iter.rowVars).length>0&&(
+                  <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                    {Object.entries(iter.rowVars).map(([k,v])=>(
+                      <span key={k} style={{fontSize:10,fontFamily:C.mono,background:'rgba(124,106,247,0.08)',border:'1px solid rgba(124,106,247,0.2)',borderRadius:4,padding:'1px 6px',color:C.pu}}>
+                        {k}={v}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr style={{background:'#fafafa'}}>
                   {['Request','Method','Status','Result','Time'].map(h=><th key={h} style={{padding:'7px 12px',textAlign:'left',fontSize:11,color:'#94a3b8',fontWeight:600,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}
