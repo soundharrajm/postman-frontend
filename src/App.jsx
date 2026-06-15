@@ -548,26 +548,37 @@ function SingleRequestRunner({request,envVars,collectionVars,onClose}){
             <thead><tr style={{background:'#f8f8fc'}}>
               {['Row','Vars','Status','Result','Time'].map(h=><th key={h} style={{padding:'7px 12px',textAlign:'left',fontSize:11,color:'#94a3b8',fontWeight:600,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}
             </tr></thead>
-            <tbody>{results.map((r,i)=>{const sc=SC(r.status);return(
-              <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
-                <td style={{padding:'8px 12px',fontSize:12,color:'#1a1a2e',fontFamily:C.mono}}>{r.row}</td>
-                <td style={{padding:'8px 12px'}}>
-                  <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
-                    {Object.entries(r.rowVars||{}).map(([k,v])=>(
-                      <span key={k} style={{fontSize:10,fontFamily:C.mono,background:'rgba(124,106,247,0.08)',border:'1px solid rgba(124,106,247,0.15)',borderRadius:3,padding:'1px 5px',color:C.pu}}>{k}=<b>{v}</b></span>
-                    ))}
-                    {Object.keys(r.rowVars||{}).length===0&&<span style={{fontSize:10,color:'#cbd5e1'}}>—</span>}
-                  </div>
-                </td>
-                <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}18`,border:`1px solid ${sc}55`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
-                <td style={{padding:'8px 12px'}}>
-                  {r.error?<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Error</span>
-                    :r.passed?<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:'1px solid rgba(22,163,74,0.25)',borderRadius:5,padding:'3px 9px'}}>✓ Passed</span>
-                    :<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Failed</span>}
-                </td>
-                <td style={{padding:'8px 12px',fontSize:11,color:'#94a3b8',fontFamily:C.mono}}>{r.elapsed}ms</td>
-              </tr>
-            )})</tbody>
+            <tbody>
+              {results.map((r,i)=>{
+                const sc=SC(r.status)
+                return(
+                  <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
+                    <td style={{padding:'8px 12px',fontSize:12,color:'#1a1a2e',fontFamily:C.mono}}>{r.row}</td>
+                    <td style={{padding:'8px 12px'}}>
+                      <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                        {Object.entries(r.rowVars||{}).map(([k,v])=>(
+                          <span key={k} style={{fontSize:10,fontFamily:C.mono,background:'rgba(124,106,247,0.08)',border:'1px solid rgba(124,106,247,0.15)',borderRadius:3,padding:'1px 5px',color:C.pu}}>{k}=<b>{v}</b></span>
+                        ))}
+                        {Object.keys(r.rowVars||{}).length===0&&<span style={{fontSize:10,color:'#cbd5e1'}}>—</span>}
+                      </div>
+                    </td>
+                    <td style={{padding:'8px 12px'}}>
+                      {r.status>0
+                        ? <span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}18`,border:`1px solid ${sc}55`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>
+                        : <span style={{color:C.red,fontSize:11}}>—</span>}
+                    </td>
+                    <td style={{padding:'8px 12px'}}>
+                      {r.error
+                        ? <span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Error</span>
+                        : r.passed
+                          ? <span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:'1px solid rgba(22,163,74,0.25)',borderRadius:5,padding:'3px 9px'}}>✓ Passed</span>
+                          : <span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Failed</span>}
+                    </td>
+                    <td style={{padding:'8px 12px',fontSize:11,color:'#94a3b8',fontFamily:C.mono}}>{r.elapsed}ms</td>
+                  </tr>
+                )
+              })}
+            </tbody>
           </table>
         </div>
       </div>
@@ -769,20 +780,31 @@ function CollectionRunner({collection,envVars,onClose}){
                 <thead><tr style={{background:'#fafafa'}}>
                   {['Request','Method','Status','Result','Time'].map(h=><th key={h} style={{padding:'7px 12px',textAlign:'left',fontSize:11,color:'#94a3b8',fontWeight:600,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}
                 </tr></thead>
-                <tbody>{iter.requests.map((r,i)=>{
-                  const mc=MC[r.method]||MC.GET;const sc=SC(r.status)
-                  return(<tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
-                    <td style={{padding:'8px 12px',fontSize:12,color:'#1a1a2e',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</td>
-                    <td style={{padding:'8px 12px'}}><span style={{fontSize:9,fontWeight:700,color:mc.text,background:mc.bg,border:`1px solid ${mc.border}`,borderRadius:3,padding:'1px 5px',fontFamily:C.mono}}>{r.method}</span></td>
-                    <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}15`,border:`1px solid ${sc}55`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
-                    <td style={{padding:'8px 12px'}}>
-                      {r.error?<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:`1px solid rgba(220,38,38,0.25)`,borderRadius:5,padding:'3px 10px'}}>✗ Error</span>
-                        :r.passed?<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:`1px solid rgba(22,163,74,0.25)`,borderRadius:5,padding:'3px 10px'}}>✓ Passed</span>
-                        :<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:`1px solid rgba(220,38,38,0.25)`,borderRadius:5,padding:'3px 10px'}}>✗ Failed</span>}
-                    </td>
-                    <td style={{padding:'8px 12px',fontSize:11,color:'#94a3b8',fontFamily:C.mono}}>{r.elapsed}ms</td>
-                  </tr>)
-                })}</tbody>
+                <tbody>
+                  {iter.requests.map((r,i)=>{
+                    const mc=MC[r.method]||MC.GET
+                    const sc=SC(r.status)
+                    return(
+                      <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
+                        <td style={{padding:'8px 12px',fontSize:12,color:'#1a1a2e',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</td>
+                        <td style={{padding:'8px 12px'}}><span style={{fontSize:9,fontWeight:700,color:mc.text,background:mc.bg,border:`1px solid ${mc.border}`,borderRadius:3,padding:'1px 5px',fontFamily:C.mono}}>{r.method}</span></td>
+                        <td style={{padding:'8px 12px'}}>
+                          {r.status>0
+                            ? <span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}15`,border:`1px solid ${sc}55`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>
+                            : <span style={{color:C.red,fontSize:11}}>—</span>}
+                        </td>
+                        <td style={{padding:'8px 12px'}}>
+                          {r.error
+                            ? <span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 10px'}}>✗ Error</span>
+                            : r.passed
+                              ? <span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:'1px solid rgba(22,163,74,0.25)',borderRadius:5,padding:'3px 10px'}}>✓ Passed</span>
+                              : <span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 10px'}}>✗ Failed</span>}
+                        </td>
+                        <td style={{padding:'8px 12px',fontSize:11,color:'#94a3b8',fontFamily:C.mono}}>{r.elapsed}ms</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
               </table>
             </div>
           ))}
