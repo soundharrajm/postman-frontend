@@ -45,9 +45,7 @@ export default function AuthEditor({ auth, onChange }) {
         ))}
       </div>
 
-      {auth.type === 'bearer' && (
-        <input value={auth.token} onChange={e => set('token', e.target.value)} placeholder="Bearer token" style={inp} />
-      )}
+      {auth.type === 'bearer' && <BearerInput value={auth.token} onChange={v => set('token', v)} inp={inp} />}
 
       {auth.type === 'basic' && (
         <div style={{ display: 'flex', gap: 8 }}>
