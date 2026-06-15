@@ -57,11 +57,12 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
 
         <SmartUrlBar
           value={request.url}
-          onChange={url => {
+          onChange={url => onUpdate({ ...request, url })}
+          onPasteUrl={url => {
             if (url.trimStart?.().startsWith('curl')) {
               try { const c = parseCurl(url); onUpdate({ ...request, method: c.method, url: c.url, headers: c.headers.length ? c.headers : request.headers, body: c.body || request.body, bodyType: c.body ? 'json' : request.bodyType }); return } catch {}
             }
-            // Auto-parse query params from URL into Params tab (like Postman)
+            // Auto-parse query params only on paste
             try {
               const u = new URL(url)
               if (u.search) {

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { C } from '../constants.js'
 import { parseCurl } from '../utils/helpers.js'
 
-export default function SmartUrlBar({ value, onChange, onSend, envVars, collectionVars, onUpdateCollectionVar }) {
+export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVars, collectionVars, onUpdateCollectionVar }) {
   const [popover, setPopover] = useState(null)
   const [popVal,  setPopVal]  = useState('')
   const inputRef = useRef(null)
@@ -32,10 +32,9 @@ export default function SmartUrlBar({ value, onChange, onSend, envVars, collecti
         onKeyDown={e => { if (e.key === 'Enter') onSend() }}
         onPaste={e => {
           const p = e.clipboardData.getData('text')
-          if (p.trimStart().startsWith('curl')) {
-            e.preventDefault()
-            try { const c = parseCurl(p); onChange(c.url) } catch {}
-          }
+          e.preventDefault()
+          if (onPasteUrl) onPasteUrl(p)
+          else onChange(p)
         }}
         placeholder="https://api.example.com/...  or paste cURL"
         style={{
