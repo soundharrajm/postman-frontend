@@ -48,7 +48,12 @@ function importPostmanCollection(json) {
   const colName = data.info?.name||'Imported'
   const requests=[]
   const parseItem=(item)=>{
-    if(item.item){item.item.forEach(parseItem);return}
+    // Handle folders — recurse into nested items
+    if(item.item && Array.isArray(item.item)){
+      item.item.forEach(parseItem)
+      return
+    }
+    if(!item.request && !item.item) return // skip invalid items
     const req=item.request||{}
     const url=typeof req.url==='string'?req.url:req.url?.raw||''
     const headers=(req.header||[]).map(h=>({id:uid(),key:h.key||'',value:h.value||'',enabled:!h.disabled}))
@@ -244,7 +249,7 @@ function ResponseViewer({response,loading,elapsed}){
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
 function Sidebar({collections,activeId,onSelect,onNew,onNewCollection,onDeleteRequest,onRenameCollection,onDeleteCollection,onImport,onRun,onExport}){
-  const[exp,setExp]=useState({})
+  const[exp,setExp]=useState(()=>{ const e={}; collections.forEach(c=>{e[c.id]=true}); const forced=localStorage.getItem('apiforge_expanded_col'); if(forced)e[forced]=true; return e })
   const[editCol,setEditCol]=useState(null)
   const[colName,setColName]=useState('')
   const tog=(id)=>setExp(e=>({...e,[id]:!e[id]}))
@@ -1127,6 +1132,8 @@ export default function App(){
           setCollections(cs=>[...cs,col])
           if(d.requests.length) setActiveId(d.requests[0].id)
           setImportError(null)
+          // Force sidebar to show — store expanded id
+          localStorage.setItem('apiforge_expanded_col', col.id)
         } else {
           throw new Error('Unknown file format — must be a Postman collection or APIforge backup')
         }
