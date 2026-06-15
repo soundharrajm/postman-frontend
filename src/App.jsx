@@ -906,6 +906,18 @@ export default function App(){
 
   const deleteReq=(colId,reqId)=>{setCollections(cs=>cs.map(c=>c.id===colId?{...c,requests:c.requests.filter(r=>r.id!==reqId)}:c));if(activeId===reqId)setActiveId(null)}
 
+  const loadFromHistory=(h)=>{
+    const existing=collections.flatMap(c=>c.requests).find(r=>r.id===h.reqId)
+    if(existing){setActiveId(h.reqId);return}
+    const req={...newReq(),name:h.url.split('/').filter(Boolean).pop()||'Request',method:h.method,url:h.url}
+    if(collections.length===0){
+      const col=newCol();col.requests.push(req);setCollections([col])
+    } else {
+      setCollections(cs=>cs.map((c,i)=>i===0?{...c,requests:[...c.requests,req]}:c))
+    }
+    setActiveId(req.id)
+  }
+
   const handleImport=(e)=>{
     const file=e.target.files?.[0];if(!file)return
     const reader=new FileReader()
@@ -994,7 +1006,7 @@ export default function App(){
 
     {showEnv&&<EnvPanel envs={envs} active={activeEnv} onSetActive={setActiveEnv} onUpdate={(id,vars)=>setEnvs(es=>es.map(e=>e.id===id?{...e,vars}:e))} onAdd={()=>{const e={id:uid(),name:'New Environment',vars:[{id:uid(),key:'',value:'',enabled:true}]};setEnvs(es=>[...es,e]);setActiveEnv(e.id)}} onDelete={(id)=>{setEnvs(es=>es.filter(e=>e.id!==id));if(activeEnv===id)setActiveEnv(null)}}/>}
     {showEnv&&<div onClick={()=>setShowEnv(false)} style={{position:'fixed',inset:0,zIndex:199}}/>}
-    {showHist&&<HistoryPanel history={history} onSelect={h=>{if(h.reqId)setActiveId(h.reqId)}} onClose={()=>setShowHist(false)}/>}
+    {showHist&&<HistoryPanel history={history} onSelect={loadFromHistory} onClear={()=>setHistory([])} onClose={()=>setShowHist(false)}/>}
     {showBackend&&<BackendSettings onClose={()=>setShowBackend(false)}/>}
     {csvRunReq&&<SingleRequestRunner request={csvRunReq} envVars={envVars} collectionVars={activeCol?.vars||{}} onClose={()=>setCsvRunReq(null)}/> }
     {runnerCol&&<CollectionRunner collection={runnerCol} envVars={envVars} onClose={()=>setRunnerCol(null)}/>}
