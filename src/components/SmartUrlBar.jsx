@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { C } from '../constants.js'
+import { C } from '../constants.jsx'
 import { parseCurl } from '../utils/helpers.js'
 
 export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVars, collectionVars, onUpdateCollectionVar }) {

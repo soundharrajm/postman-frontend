@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { C, STORAGE_KEYS as SK } from './constants.js'
+import { C, STORAGE_KEYS as SK } from './constants.jsx'
 import { uid, getApiUrl, newRequest, newCollection, importPostmanCollection } from './utils/helpers.js'
 
 import Sidebar          from './components/Sidebar.jsx'

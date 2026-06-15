@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { C, MC, METHODS } from '../constants.js'
+import { C, MC, METHODS } from '../constants.jsx'
 import { parseCurl, buildCurl } from '../utils/helpers.js'
 import KeyValueEditor from './KeyValueEditor.jsx'
 import AuthEditor     from './AuthEditor.jsx'

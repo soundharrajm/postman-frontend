@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { C, SC } from '../constants.js'
+import { C, SC } from '../constants.jsx'
 import { getApiUrl } from '../utils/helpers.js'
 
 function CopyButton({ text, label = '📋 Copy' }) {

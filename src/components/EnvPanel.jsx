@@ -1,4 +1,4 @@
-import { C } from '../constants.js'
+import { C } from '../constants.jsx'
 import { uid } from '../utils/helpers.js'
 import KeyValueEditor from './KeyValueEditor.jsx'
 

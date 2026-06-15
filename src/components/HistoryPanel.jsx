@@ -1,4 +1,4 @@
-import { C, MC, SC } from '../constants.js'
+import { C, MC, SC } from '../constants.jsx'
 
 export default function HistoryPanel({ history, onSelect, onClear, onClose }) {
   return (

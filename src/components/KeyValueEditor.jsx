@@ -1,4 +1,4 @@
-import { C, uid } from '../constants.js'
+import { C, uid } from '../constants.jsx'
 import { uid as makeId } from '../utils/helpers.js'
 
 export default function KeyValueEditor({ rows, onChange, placeholder = ['Key', 'Value'] }) {

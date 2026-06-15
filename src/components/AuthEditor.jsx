@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { C } from '../constants.js'
+import { C } from '../constants.jsx'
 
 function BearerInput({ value, onChange, inp }) {
   const [show, setShow] = useState(false)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { C } from '../constants.js'
+import { C } from '../constants.jsx'
 import { getApiUrl } from '../utils/helpers.js'
 
 export default function BackendSettings({ onClose, onSaved }) {

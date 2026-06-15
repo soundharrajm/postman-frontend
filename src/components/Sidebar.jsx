@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { C, MC } from '../constants.js'
+import { C, MC } from '../constants.jsx'
 
 export default function Sidebar({ collections, activeId, onSelect, onNew, onNewCollection, onDeleteRequest, onRenameCollection, onDeleteCollection, onImport, onRun, onExport }) {
   const [exp,     setExp]     = useState(() => { const e = {}; collections.forEach(c => { e[c.id] = true }); return e })

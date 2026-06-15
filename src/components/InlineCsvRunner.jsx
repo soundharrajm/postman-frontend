@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { C, SC } from '../constants.js'
+import { C, SC } from '../constants.jsx'
 import { getApiUrl, parseCSV } from '../utils/helpers.js'
 
 export default function InlineCsvRunner({ request, envVars, collectionVars, onClose }) {
