@@ -65,7 +65,7 @@ function newCollection(name = 'New Collection') {
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────
-function Sidebar({ collections, activeId, onSelect, onNew, onNewCollection, onDeleteRequest, onRenameCollection, onDeleteCollection }) {
+function Sidebar({ collections, activeId, onSelect, onNew, onNewCollection, onDeleteRequest, onRenameCollection, onDeleteCollection, onImport }) {
   const [expanded, setExpanded] = useState({})
   const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }))
   const [editingCol, setEditingCol] = useState(null)
@@ -76,7 +76,10 @@ function Sidebar({ collections, activeId, onSelect, onNew, onNewCollection, onDe
       {/* Header */}
       <div style={{ padding:'12px 14px', borderBottom:`1px solid ${C.border}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <span style={{ fontSize:12, fontWeight:700, color:'#e8e8f0', letterSpacing:'.5px', textTransform:'uppercase' }}>Collections</span>
-        <button onClick={onNewCollection} title="New collection" style={{ width:24, height:24, borderRadius:6, border:`1px solid ${C.border}`, background:'rgba(255,255,255,0.05)', color:'#888', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+        <div style={{ display:'flex', gap:5 }}>
+          <button onClick={onImport} title="Import collection" style={{ width:24, height:24, borderRadius:6, border:`1px solid ${C.border}`, background:'rgba(255,255,255,0.05)', color:'#888', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>↑</button>
+          <button onClick={onNewCollection} title="New collection" style={{ width:24, height:24, borderRadius:6, border:`1px solid ${C.border}`, background:'rgba(255,255,255,0.05)', color:'#888', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+        </div>
       </div>
 
       <div style={{ flex:1, overflowY:'auto' }}>
@@ -416,8 +419,25 @@ function RequestEditor({ request, onUpdate, onSend, loading, envVars }) {
 
         <div style={{ flex:1, position:'relative' }}>
           <input value={request.url} onChange={e=>onUpdate({...request,url:e.target.value})}
-            placeholder="https://api.example.com/endpoint  (use {{variable}} for env vars)"
+            placeholder="https://api.example.com/...  or paste a cURL command"
             onKeyDown={e=>{ if(e.key==='Enter') onSend(urlWithParams()) }}
+            onPaste={e=>{
+              const pasted = e.clipboardData.getData('text')
+              if (pasted.trimStart().startsWith('curl')) {
+                e.preventDefault()
+                try {
+                  const parsed = parseCurl(pasted)
+                  onUpdate({
+                    ...request,
+                    method:  parsed.method,
+                    url:     parsed.url,
+                    headers: parsed.headers.length ? parsed.headers : request.headers,
+                    body:    parsed.body || request.body,
+                    bodyType:parsed.body ? 'json' : request.bodyType,
+                  })
+                } catch(_) { /* fall through to normal paste */ }
+              }
+            }}
             style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 14px', fontSize:13, color:'#e8e8f0', outline:'none', fontFamily:C.mono, boxSizing:'border-box' }} />
           {resolvedUrl !== request.url && (
             <div style={{ position:'absolute', bottom:-18, left:0, fontSize:10, color:'#555', fontFamily:C.mono, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'80%' }}>→ {resolvedUrl}</div>
@@ -498,6 +518,8 @@ export default function App() {
   const [showEnv, setShowEnv]         = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showBackendSettings, setShowBackendSettings] = useState(false)
+  const [importError, setImportError]         = useState(null)
+  const importFileRef = useRef(null)
 
   // Persist
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(collections)) }, [collections])
@@ -516,6 +538,26 @@ export default function App() {
     setCollections(cs => cs.map(c => ({
       ...c, requests: c.requests.map(r => r.id===updated.id ? updated : r)
     })))
+  }
+
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const imported = importPostmanCollection(ev.target.result)
+        const col = { id:uid(), name:imported.name, requests:imported.requests }
+        setCollections(cs => [...cs, col])
+        if (imported.requests.length) setActiveReqId(imported.requests[0].id)
+        setImportError(null)
+      } catch(err) {
+        setImportError(err.message)
+        setTimeout(()=>setImportError(null), 4000)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
   }
 
   const newRequest_ = (colId) => {
@@ -623,6 +665,12 @@ export default function App() {
 
       {/* ── Main layout ── */}
       <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+        <input ref={importFileRef} type="file" accept=".json" style={{ display:'none' }} onChange={handleImportFile} />
+        {importError && (
+          <div style={{ position:'fixed', bottom:16, left:260, zIndex:300, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:8, padding:'8px 14px', fontSize:12, color:'#f87171' }}>
+            ✗ {importError}
+          </div>
+        )}
         <Sidebar
           collections={collections}
           activeId={activeReqId}
@@ -632,6 +680,7 @@ export default function App() {
           onDeleteRequest={deleteRequest}
           onRenameCollection={(id,name)=>setCollections(cs=>cs.map(c=>c.id===id?{...c,name}:c))}
           onDeleteCollection={(id)=>setCollections(cs=>cs.filter(c=>c.id!==id))}
+          onImport={()=>importFileRef.current?.click()}
         />
 
         {/* ── Request + Response pane ── */}
