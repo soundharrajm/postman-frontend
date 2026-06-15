@@ -32,9 +32,15 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
         onKeyDown={e => { if (e.key === 'Enter') onSend() }}
         onPaste={e => {
           const p = e.clipboardData.getData('text')
-          e.preventDefault()
-          if (onPasteUrl) onPasteUrl(p)
-          else onChange(p)
+          // Only intercept if pasting a full URL or curl command
+          const isCurl = p.trimStart().startsWith('curl')
+          const isFullUrl = p.trimStart().startsWith('http')
+          if (isCurl || isFullUrl) {
+            e.preventDefault()
+            if (onPasteUrl) onPasteUrl(p)
+            else onChange(p)
+          }
+          // Otherwise let browser handle normal paste (appends at cursor)
         }}
         placeholder="https://api.example.com/...  or paste cURL"
         style={{
