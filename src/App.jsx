@@ -276,7 +276,7 @@ function Sidebar({collections,activeId,onSelect,onNew,onNewCollection,onDeleteRe
             return(<div key={req.id} onClick={()=>onSelect(req.id)} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px 6px 28px',cursor:'pointer',background:active?'rgba(124,106,247,0.08)':'transparent',borderLeft:active?`2.5px solid ${C.pu}`:'2.5px solid transparent'}}>
               <span style={{fontSize:9,fontWeight:700,color:mc.text,background:mc.bg,border:`1px solid ${mc.border}`,borderRadius:3,padding:'1px 4px',flexShrink:0,fontFamily:C.mono}}>{req.method}</span>
               <span style={{flex:1,fontSize:11,color:active?'#1a1a2e':'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{req.name}</span>
-              <button onClick={e=>{e.stopPropagation();onDeleteRequest(col.id,req.id)}} style={{width:16,height:16,border:'none',background:'none',color:'#cbd5e1',fontSize:10,cursor:'pointer',opacity:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0}>✕</button>
+              <button onClick={e=>{e.stopPropagation();onDeleteRequest(col.id,req.id)}} style={{width:16,height:16,border:'none',background:'none',color:'#cbd5e1',fontSize:10,cursor:'pointer',borderRadius:3,flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.color=C.red} onMouseLeave={e=>e.currentTarget.style.color='#cbd5e1'}>✕</button>
             </div>)
           })}
         </div>
@@ -319,7 +319,7 @@ function RequestEditor({request,onUpdate,onSend,loading,envVars,collectionVars,o
       <button onClick={()=>onSend(urlWithParams())} disabled={loading||!request.url.trim()} style={{padding:'10px 28px',borderRadius:8,fontSize:13,fontWeight:700,cursor:loading||!request.url.trim()?'not-allowed':'pointer',fontFamily:'inherit',border:'none',background:loading||!request.url.trim()?'rgba(124,106,247,0.3)':C.pu,color:'#fff',flexShrink:0}}>
         {loading?'⏳':'Send'}
       </button>
-      <button onClick={onOpenCsvRunner} title="Run with CSV data" style={{padding:'10px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',flexShrink:0}} title="Run with CSV">
+      <button onClick={onOpenCsvRunner} title="Run with CSV data" style={{padding:'10px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',flexShrink:0}}>
         📊 CSV Run
       </button>
     </div>
@@ -559,7 +559,7 @@ function SingleRequestRunner({request,envVars,collectionVars,onClose}){
                     {Object.keys(r.rowVars||{}).length===0&&<span style={{fontSize:10,color:'#cbd5e1'}}>—</span>}
                   </div>
                 </td>
-                <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:sc+'15',border:'1px solid '+sc+'35',borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
+                <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:sc+'18',border:`1px solid ${sc}44`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
                 <td style={{padding:'8px 12px'}}>
                   {r.error?<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Error</span>
                     :r.passed?<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:'1px solid rgba(22,163,74,0.25)',borderRadius:5,padding:'3px 9px'}}>✓ Passed</span>
