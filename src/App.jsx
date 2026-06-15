@@ -34,6 +34,9 @@ export default function App() {
 
   const importRef = useRef(null)
 
+  // ── Page title ──────────────────────────────────────────────────────────────
+  useEffect(() => { document.title = 'API Market' }, [])
+
   // ── Persist ─────────────────────────────────────────────────────────────────
   useEffect(() => { localStorage.setItem(SK.collections, JSON.stringify(collections)) }, [collections])
   useEffect(() => { localStorage.setItem(SK.envs,        JSON.stringify(envs))        }, [envs])
@@ -174,8 +177,17 @@ export default function App() {
       {/* ── Topbar ── */}
       <div style={{ height: 46, background: '#fff', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg,${C.pu},#ec4899)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: '#fff' }}>⚡</div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', letterSpacing: '-.3px' }}>APIforge</span>
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="30" height="30" rx="8" fill="url(#apm_grad)"/>
+            <defs>
+              <linearGradient id="apm_grad" x1="0" y1="0" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#6366f1"/>
+                <stop offset="100%" stopColor="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+            <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fill="white" fontSize="11" fontWeight="800" fontFamily="Inter,sans-serif" letterSpacing="-0.5">APM</text>
+          </svg>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#1a1a2e', letterSpacing: '-.5px' }}>API Market</span>
         </div>
 
         <div style={{ height: 20, width: 1, background: C.border }} />
