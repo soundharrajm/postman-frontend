@@ -1001,7 +1001,15 @@ export default function App(){
       </select>
       <button onClick={()=>setShowEnv(true)} style={{fontSize:11,padding:'5px 12px',borderRadius:7,border:`1px solid rgba(124,106,247,0.25)`,background:'rgba(124,106,247,0.06)',color:C.pu,cursor:'pointer',fontFamily:'inherit'}}>⚙ Environments</button>
       <button onClick={()=>setShowHist(true)} style={{fontSize:11,padding:'5px 12px',borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',cursor:'pointer',fontFamily:'inherit'}}>🕐 History</button>
-      <button onClick={()=>setShowBackend(true)} style={{fontSize:11,padding:'5px 12px',borderRadius:7,border:`1px solid rgba(124,106,247,0.25)`,background:'rgba(124,106,247,0.06)',color:C.pu,cursor:'pointer',fontFamily:'inherit'}}>🔗 Backend</button>
+      <button onClick={()=>setShowBackend(true)} style={{
+          fontSize:11,padding:'5px 12px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,
+          border: backendOk===true?'1px solid rgba(22,163,74,0.3)':backendOk===false?'1px solid rgba(220,38,38,0.3)':'1px solid rgba(124,106,247,0.25)',
+          background: backendOk===true?'rgba(22,163,74,0.06)':backendOk===false?'rgba(220,38,38,0.06)':'rgba(124,106,247,0.06)',
+          color: backendOk===true?C.green:backendOk===false?C.red:C.pu,
+        }}>
+          <span style={{width:7,height:7,borderRadius:'50%',background:backendOk===true?C.green:backendOk===false?C.red:'#94a3b8',display:'inline-block',flexShrink:0}}/>
+          Backend
+        </button>
     </div>
 
     {/* Main */}
