@@ -518,7 +518,16 @@ function BackendSettings({onClose}){
   const[url,setUrl]=useState(getApiUrl())
   const[status,setStatus]=useState(null)
   const[testing,setTesting]=useState(false)
-  const test=async()=>{setTesting(true);setStatus(null);try{const r=await fetch(`${url}/health`,{signal:AbortSignal.timeout(5000)});const d=await r.json();setStatus({ok:true,msg:`Connected ✓  (${d.runtime||'ok'})`})}catch(e){setStatus({ok:false,msg:`Failed: ${e.message}`)}}finally{setTesting(false)}}
+  const test=async()=>{
+    setTesting(true); setStatus(null)
+    try {
+      const r=await fetch(url+'/health',{signal:AbortSignal.timeout(5000)})
+      const d=await r.json()
+      setStatus({ok:true, msg:'Connected ✓  ('+(d.runtime||'ok')+')'})
+    } catch(e) {
+      setStatus({ok:false, msg:'Failed: '+e.message})
+    } finally { setTesting(false) }
+  }
   const save=()=>{const c=url.replace(/\/$/,'');localStorage.setItem('apiforge_backend_url',c);onClose()}
   return(<div style={{position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
     <div style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:14,padding:28,width:500,boxShadow:'0 8px 40px rgba(0,0,0,0.12)'}}>
