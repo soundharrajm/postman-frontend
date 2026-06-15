@@ -1110,7 +1110,28 @@ export default function App(){
   const handleImport=(e)=>{
     const file=e.target.files?.[0];if(!file)return
     const reader=new FileReader()
-    reader.onload=(ev)=>{try{const d=importPostmanCollection(ev.target.result);const col={id:uid(),name:d.name,requests:d.requests,vars:d.vars||{}};setCollections(cs=>[...cs,col]);if(d.requests.length)setActiveId(d.requests[0].id);setImportError(null)}catch(err){setImportError(err.message);setTimeout(()=>setImportError(null),4000)}}
+    reader.onload=(ev)=>{
+      try{
+        const raw=JSON.parse(ev.target.result)
+        // Detect format: backup JSON vs Postman collection
+        if(raw.collections && Array.isArray(raw.collections)){
+          // APIforge backup format
+          if(raw.collections.length) setCollections(raw.collections)
+          if(raw.history?.length)    setHistory(raw.history)
+          if(raw.envs?.length)       setEnvs(raw.envs)
+          setImportError(null)
+        } else if(raw.info || raw.item){
+          // Postman collection format
+          const d=importPostmanCollection(raw)
+          const col={id:uid(),name:d.name,requests:d.requests,vars:d.vars||{}}
+          setCollections(cs=>[...cs,col])
+          if(d.requests.length) setActiveId(d.requests[0].id)
+          setImportError(null)
+        } else {
+          throw new Error('Unknown file format — must be a Postman collection or APIforge backup')
+        }
+      }catch(err){setImportError(err.message);setTimeout(()=>setImportError(null),5000)}
+    }
     reader.readAsText(file);e.target.value=''
   }
 
@@ -1160,19 +1181,7 @@ export default function App(){
       }} style={{fontSize:11,padding:'5px 11px',borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',cursor:'pointer',fontFamily:'inherit'}}>↓ Export</button>
       <label style={{fontSize:11,padding:'5px 11px',borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',cursor:'pointer',fontFamily:'inherit',display:'inline-flex',alignItems:'center'}}>
         ↑ Import
-        <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{
-          const file=e.target.files?.[0];if(!file)return
-          const reader=new FileReader()
-          reader.onload=ev=>{
-            try{
-              const d=JSON.parse(ev.target.result)
-              if(d.collections) setCollections(d.collections)
-              if(d.history)     setHistory(d.history)
-              if(d.envs)        setEnvs(d.envs)
-            }catch{ alert('Invalid backup file') }
-          }
-          reader.readAsText(file);e.target.value=''
-        }}/>
+        <input type="file" accept=".json" style={{display:'none'}} onChange={handleImport}/>
       </label>
       <button onClick={()=>setShowBackend(true)} style={{
           fontSize:11,padding:'5px 12px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5,
