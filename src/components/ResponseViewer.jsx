@@ -2,6 +2,26 @@ import { useState, useEffect } from 'react'
 import { C, SC } from '../constants.js'
 import { getApiUrl } from '../utils/helpers.js'
 
+function CopyButton({ text, label = '📋 Copy' }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 5000)
+  }
+  return (
+    <button onClick={copy} style={{
+      marginLeft: 'auto', padding: '3px 9px', borderRadius: 5, fontSize: 11,
+      cursor: 'pointer', fontFamily: 'inherit', transition: 'all .2s',
+      border: copied ? '1px solid rgba(22,163,74,0.3)' : '1px solid rgba(0,0,0,0.08)',
+      background: copied ? 'rgba(22,163,74,0.06)' : '#fff',
+      color: copied ? '#16a34a' : '#64748b',
+    }}>
+      {copied ? '✓ Copied' : label}
+    </button>
+  )
+}
+
 function CodeGen({ req }) {
   const [lang,   setLang]   = useState('fetch')
   const [code,   setCode]   = useState('')
@@ -23,7 +43,7 @@ function CodeGen({ req }) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ display: 'flex', gap: 6, padding: '8px 16px', borderBottom: `1px solid ${C.border}`, flexShrink: 0, alignItems: 'center' }}>
         {['fetch', 'axios', 'curl', 'python'].map(l => <button key={l} onClick={() => setLang(l)} style={tab(l)}>{l}</button>)}
-        <button onClick={copy} style={{ marginLeft: 'auto', padding: '4px 11px', borderRadius: 5, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${C.border}`, background: '#fff', color: copied ? C.green : '#64748b' }}>{copied ? '✓ Copied' : '📋 Copy'}</button>
+        <CopyButton text={code} label="📋 Copy" />
       </div>
       <pre style={{ flex: 1, margin: 0, padding: 16, overflowY: 'auto', fontSize: 12, fontFamily: C.mono, color: '#1a1a2e', lineHeight: 1.7, whiteSpace: 'pre-wrap', background: '#f8f8fc' }}>{code || '// Select a language'}</pre>
     </div>
@@ -82,7 +102,7 @@ export default function ResponseViewer({ response, loading, elapsed }) {
             {['pretty', 'raw', 'preview'].map(v => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '3px 9px', borderRadius: 5, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: view === v ? `1.5px solid ${C.pu}` : `1px solid ${C.border}`, background: view === v ? 'rgba(124,106,247,0.06)' : '#fff', color: view === v ? C.pu : '#64748b' }}>{v}</button>
             ))}
-            <button onClick={() => navigator.clipboard.writeText(response.body)} style={{ marginLeft: 'auto', padding: '3px 9px', borderRadius: 5, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${C.border}`, background: '#fff', color: '#64748b' }}>📋 Copy</button>
+            <CopyButton text={response.body} />
           </div>
           {view === 'preview'
             ? <iframe srcDoc={response.body} style={{ flex: 1, border: 'none', background: '#fff' }} />

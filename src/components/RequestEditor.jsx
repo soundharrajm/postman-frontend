@@ -7,6 +7,7 @@ import SmartUrlBar    from './SmartUrlBar.jsx'
 
 export default function RequestEditor({ request, onUpdate, onSend, loading, envVars, collectionVars, onUpdateCollectionVar, onOpenCsvRunner }) {
   const [tab, setTab] = useState('params')
+  const [copied, setCopied] = useState(false)
   const mc = MC[request.method] || MC.GET
 
   const resolve = (s) => s.replace(/\{\{(\w+)\}\}/g, (_, k) => collectionVars?.[k] ?? envVars[k] ?? `{{${k}}}`)
@@ -14,17 +15,20 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
   const urlWithParams = () => {
     const en = (request.params || []).filter(p => p.enabled && p.key)
     if (!en.length) return resolve(request.url)
-    // Parse existing URL to avoid duplicating params already in the URL
+    // Merge: URL params + Params tab, deduplicate by key (Params tab wins)
     let base = resolve(request.url)
-    let existingKeys = []
     try {
       const u = new URL(base)
-      existingKeys = [...u.searchParams.keys()]
-      // Strip existing query string — params tab is source of truth
-      base = u.origin + u.pathname
+      // Remove keys that exist in Params tab to avoid duplicates
+      const tabKeys = en.map(p => p.key)
+      tabKeys.forEach(k => u.searchParams.delete(k))
+      // Add Params tab values
+      en.forEach(p => u.searchParams.append(p.key, resolve(p.value)))
+      return u.toString()
     } catch {}
+    // Fallback for non-parseable URLs
     const qs = en.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(resolve(p.value))}`).join('&')
-    return `${base}?${qs}`
+    return `${base}${base.includes('?') ? '&' : '?'}${qs}`
   }
 
   const tabBtn = (t, label) => ({
@@ -37,6 +41,8 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
   const copyAsCurl = () => {
     const curl = buildCurl(request, urlWithParams())
     navigator.clipboard.writeText(curl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 5000)
   }
 
   return (
@@ -90,8 +96,8 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
         </button>
 
         <button onClick={copyAsCurl} title="Copy as cURL"
-          style={{ padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', flexShrink: 0 }}>
-          📋 cURL
+          style={{ padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${copied ? 'rgba(22,163,74,0.3)' : C.border}`, background: copied ? 'rgba(22,163,74,0.06)' : '#f8f8fc', color: copied ? C.green : '#64748b', flexShrink: 0, transition: 'all .2s' }}>
+          {copied ? '✓ Copied' : '📋 cURL'}
         </button>
 
         <button onClick={onOpenCsvRunner}
