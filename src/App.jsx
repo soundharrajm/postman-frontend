@@ -289,7 +289,7 @@ function Sidebar({collections,activeId,onSelect,onNew,onNewCollection,onDeleteRe
 }
 
 // ── RequestEditor ───────────────────────────────────────────────────────────
-function RequestEditor({request,onUpdate,onSend,loading,envVars,collectionVars,onUpdateCollectionVar}){
+function RequestEditor({request,onUpdate,onSend,loading,envVars,collectionVars,onUpdateCollectionVar,onOpenCsvRunner}){
   const[tab,setTab]=useState('params')
   const mc=MC[request.method]||MC.GET
   const resolve=(s)=>s.replace(/\{\{(\w+)\}\}/g,(_,k)=>collectionVars?.[k]??envVars[k]??`{{${k}}}`)
@@ -318,6 +318,9 @@ function RequestEditor({request,onUpdate,onSend,loading,envVars,collectionVars,o
         envVars={envVars} collectionVars={collectionVars} onUpdateCollectionVar={onUpdateCollectionVar}/>
       <button onClick={()=>onSend(urlWithParams())} disabled={loading||!request.url.trim()} style={{padding:'10px 28px',borderRadius:8,fontSize:13,fontWeight:700,cursor:loading||!request.url.trim()?'not-allowed':'pointer',fontFamily:'inherit',border:'none',background:loading||!request.url.trim()?'rgba(124,106,247,0.3)':C.pu,color:'#fff',flexShrink:0}}>
         {loading?'⏳':'Send'}
+      </button>
+      <button onClick={onOpenCsvRunner} title="Run with CSV data" style={{padding:'10px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',flexShrink:0}} title="Run with CSV">
+        📊 CSV Run
       </button>
     </div>
     <div style={{display:'flex',gap:6,padding:'4px 16px 10px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -399,6 +402,179 @@ function parseCSV(text){
   })
 }
 
+
+// ── SingleRequestRunner ────────────────────────────────────────────────────
+function SingleRequestRunner({request,envVars,collectionVars,onClose}){
+  const[csvRows,setCsvRows]=useState([])
+  const[csvHeaders,setCsvHeaders]=useState([])
+  const[csvFile,setCsvFile]=useState(null)
+  const[running,setRunning]=useState(false)
+  const[results,setResults]=useState([])
+  const[delay,setDelay]=useState(0)
+  const abortRef=useRef(false)
+  const csvRef=useRef(null)
+
+  // Detect vars in this request
+  const allText=[request.url,request.body||'',...(request.headers||[]).map(h=>h.key+' '+h.value),...(request.params||[]).map(p=>p.key+' '+p.value)].join(' ')
+  const apiVars=[...new Set([...allText.matchAll(/\{\{(\w+)\}\}/g)].map(m=>m[1]))]
+
+  const resolve=(s,rowVars)=>s.replace(/\{\{(\w+)\}\}/g,(_,k)=>rowVars[k]??collectionVars[k]??envVars[k]??`{{${k}}}`)
+
+  const handleCSV=(e)=>{
+    const file=e.target.files?.[0];if(!file)return
+    setCsvFile(file.name)
+    const reader=new FileReader()
+    reader.onload=(ev)=>{const rows=parseCSV(ev.target.result);setCsvRows(rows);setCsvHeaders(rows.length?Object.keys(rows[0]):[]) }
+    reader.readAsText(file);e.target.value=''
+  }
+
+  const runAll=async()=>{
+    setRunning(true);setResults([]);abortRef.current=false
+    const rows=csvRows.length>0?csvRows:[{}]
+    const all=[]
+    for(let i=0;i<rows.length;i++){
+      if(abortRef.current)break
+      const rowVars=rows[i]
+      const t0=Date.now()
+      let status=0,statusText='',passed=false,error=null,body=''
+      try{
+        let url=resolve(request.url,rowVars)
+        const en=(request.params||[]).filter(p=>p.enabled&&p.key)
+        if(en.length){const qs=en.map(p=>`${encodeURIComponent(p.key)}=${encodeURIComponent(resolve(p.value,rowVars))}`).join('&');url=url+(url.includes('?')?'&':'?')+qs}
+        const hdrs={}
+        ;(request.headers||[]).filter(h=>h.enabled&&h.key).forEach(h=>{hdrs[h.key]=resolve(h.value,rowVars)})
+        const auth=request.auth||{}
+        if(auth.type==='bearer'&&auth.token)hdrs['Authorization']='Bearer '+resolve(auth.token,rowVars)
+        if(auth.type==='basic'&&auth.username)hdrs['Authorization']='Basic '+btoa(auth.username+':'+auth.password)
+        if(auth.type==='apikey'&&auth.key&&auth.in==='header')hdrs[auth.key]=auth.value
+        let reqBody=undefined
+        if(!['GET','HEAD'].includes(request.method)&&request.bodyType!=='none'&&request.body){hdrs['Content-Type']='application/json';reqBody=resolve(request.body,rowVars)}
+        const r=await fetch(getApiUrl()+'/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,method:request.method,headers:hdrs,body:reqBody})})
+        const d=await r.json()
+        status=d.status;statusText=d.status_text;body=d.body
+        passed=status>=200&&status<300
+      }catch(e){error=e.message;passed=false}
+      all.push({row:i+1,rowVars,status,statusText,passed,error,elapsed:Date.now()-t0,body})
+      setResults([...all])
+      if(delay>0&&i<rows.length-1)await new Promise(r=>setTimeout(r,delay))
+    }
+    setRunning(false)
+  }
+
+  const mc=MC[request.method]||MC.GET
+  const passed=results.filter(r=>r.passed).length
+  const failed=results.filter(r=>!r.passed).length
+
+  return(<div style={{position:'fixed',inset:0,zIndex:250,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center'}} onClick={e=>{if(e.target===e.currentTarget&&!running)onClose()}}>
+    <div style={{background:'#fff',border:`1px solid ${C.border}`,borderRadius:14,width:'min(860px,95vw)',maxHeight:'88vh',display:'flex',flexDirection:'column',boxShadow:'0 8px 40px rgba(0,0,0,0.12)'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 20px',borderBottom:`1px solid ${C.border}`}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:9,fontWeight:700,color:mc.text,background:mc.bg,border:`1px solid ${mc.border}`,borderRadius:4,padding:'2px 7px',fontFamily:C.mono}}>{request.method}</span>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:'#1a1a2e'}}>{request.name}</div>
+            <div style={{fontSize:11,color:'#94a3b8',fontFamily:C.mono,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:400}}>{request.url}</div>
+          </div>
+        </div>
+        {!running&&<button onClick={onClose} style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#94a3b8',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>}
+      </div>
+
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        {/* Left config */}
+        <div style={{width:240,borderRight:`1px solid ${C.border}`,padding:16,display:'flex',flexDirection:'column',gap:14,flexShrink:0,overflowY:'auto'}}>
+
+          {/* Vars found */}
+          <div>
+            <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>Vars in request</div>
+            {apiVars.length===0
+              ?<div style={{fontSize:11,color:'#cbd5e1'}}>No {'{{vars}}'} found</div>
+              :apiVars.map(v=><span key={v} style={{display:'inline-block',fontFamily:C.mono,fontSize:11,color:C.pu,background:'rgba(124,106,247,0.08)',border:'1px solid rgba(124,106,247,0.2)',borderRadius:4,padding:'2px 7px',marginRight:4,marginBottom:4}}>{'{{'+v+'}}'}</span>)
+            }
+          </div>
+
+          {/* CSV upload */}
+          <div>
+            <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>CSV Data File</div>
+            <input ref={csvRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleCSV}/>
+            <button onClick={()=>csvRef.current?.click()} style={{width:'100%',padding:'8px 10px',borderRadius:7,border:'1.5px dashed '+C.border,background:csvFile?'rgba(124,106,247,0.04)':'#f8f8fc',color:csvFile?C.pu:'#94a3b8',fontSize:11,cursor:'pointer',fontFamily:'inherit',textAlign:'left',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {csvFile?'📄 '+csvFile:'↑ Upload CSV'}
+            </button>
+            {csvHeaders.length>0&&(
+              <div style={{marginTop:8,padding:'7px 9px',background:'#f8f8fc',border:`1px solid ${C.border}`,borderRadius:7}}>
+                <div style={{fontSize:10,fontWeight:700,color:'#64748b',marginBottom:5}}>Column mapping:</div>
+                {apiVars.map(v=>{const ok=csvHeaders.includes(v);return(
+                  <div key={v} style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                    <span style={{fontFamily:C.mono,fontSize:10,color:C.pu}}>{'{{'+v+'}}'}</span>
+                    <span style={{fontSize:10,color:'#94a3b8'}}>→</span>
+                    {ok?<span style={{fontSize:10,color:C.green,fontFamily:C.mono}}>✓ {v}</span>:<span style={{fontSize:10,color:C.red}}>⚠ missing</span>}
+                  </div>
+                )})}
+                <div style={{fontSize:10,color:'#94a3b8',marginTop:4}}>{csvRows.length} rows loaded</div>
+              </div>
+            )}
+            {csvFile&&<button onClick={()=>{setCsvFile(null);setCsvRows([]);setCsvHeaders([])}} style={{marginTop:4,fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:0}}>✕ Remove</button>}
+          </div>
+
+          {/* Delay */}
+          <div>
+            <label style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',display:'block',marginBottom:6}}>Delay (ms)</label>
+            <input type="number" min={0} max={10000} value={delay} onChange={e=>setDelay(Number(e.target.value))} style={{width:'100%',background:'#f8f8fc',border:'1.5px solid '+C.border,borderRadius:7,padding:'7px 10px',fontSize:13,color:'#1a1a2e',outline:'none',fontFamily:C.mono,boxSizing:'border-box'}}/>
+          </div>
+
+          <div style={{marginTop:'auto',display:'flex',flexDirection:'column',gap:6}}>
+            <div style={{fontSize:11,color:'#94a3b8',textAlign:'center'}}>{csvRows.length>0?csvRows.length+' iterations from CSV':'Single run'}</div>
+            {!running
+              ?<button onClick={runAll} style={{width:'100%',padding:'10px',borderRadius:9,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:'none',background:C.green,color:'#fff'}}>▶ Run</button>
+              :<button onClick={()=>abortRef.current=true} style={{width:'100%',padding:'10px',borderRadius:9,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:'none',background:C.red,color:'#fff'}}>⏹ Stop</button>
+            }
+          </div>
+        </div>
+
+        {/* Results */}
+        <div style={{flex:1,overflowY:'auto',padding:16}}>
+          {results.length>0&&(
+            <div style={{display:'flex',gap:10,marginBottom:14,padding:'9px 14px',background:'#f8f8fc',border:`1px solid ${C.border}`,borderRadius:10,alignItems:'center'}}>
+              {[['Total',results.length,'#1a1a2e'],['Passed',passed,C.green],['Failed',failed,C.red]].map(([l,v,c])=>(
+                <div key={l} style={{display:'flex',alignItems:'center',gap:5}}>
+                  <span style={{fontSize:11,color:'#94a3b8',fontWeight:600}}>{l}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:c,background:c+'18',borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{v}</span>
+                </div>
+              ))}
+              {running&&<span style={{marginLeft:'auto',fontSize:11,color:'#94a3b8'}}>Running {results.length}/{csvRows.length||1}…</span>}
+            </div>
+          )}
+          {results.length===0&&!running&&<div style={{textAlign:'center',padding:40,color:'#cbd5e1'}}><div style={{fontSize:40,marginBottom:12}}>▶</div><p style={{fontSize:13}}>{csvRows.length>0?'Click Run to send '+csvRows.length+' requests':'Click Run to send request'}</p></div>}
+          <table style={{width:'100%',borderCollapse:'collapse',display:results.length?'table':'none'}}>
+            <thead><tr style={{background:'#f8f8fc'}}>
+              {['Row','Vars','Status','Result','Time'].map(h=><th key={h} style={{padding:'7px 12px',textAlign:'left',fontSize:11,color:'#94a3b8',fontWeight:600,borderBottom:`1px solid ${C.border}`}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{results.map((r,i)=>{const sc=SC(r.status);return(
+              <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
+                <td style={{padding:'8px 12px',fontSize:12,color:'#1a1a2e',fontFamily:C.mono}}>{r.row}</td>
+                <td style={{padding:'8px 12px'}}>
+                  <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                    {Object.entries(r.rowVars||{}).map(([k,v])=>(
+                      <span key={k} style={{fontSize:10,fontFamily:C.mono,background:'rgba(124,106,247,0.08)',border:'1px solid rgba(124,106,247,0.15)',borderRadius:3,padding:'1px 5px',color:C.pu}}>{k}=<b>{v}</b></span>
+                    ))}
+                    {Object.keys(r.rowVars||{}).length===0&&<span style={{fontSize:10,color:'#cbd5e1'}}>—</span>}
+                  </div>
+                </td>
+                <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:sc+'15',border:'1px solid '+sc+'35',borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
+                <td style={{padding:'8px 12px'}}>
+                  {r.error?<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Error</span>
+                    :r.passed?<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:'1px solid rgba(22,163,74,0.25)',borderRadius:5,padding:'3px 9px'}}>✓ Passed</span>
+                    :<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Failed</span>}
+                </td>
+                <td style={{padding:'8px 12px',fontSize:11,color:'#94a3b8',fontFamily:C.mono}}>{r.elapsed}ms</td>
+              </tr>
+            )})</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>)
+}
+
 // ── CollectionRunner ─────────────────────────────────────────────────────────
 function CollectionRunner({collection,envVars,onClose}){
   const[iterations,setIterations]=useState(1)
@@ -412,6 +588,7 @@ function CollectionRunner({collection,envVars,onClose}){
   const abortRef=useRef(false)
   const csvRef=useRef(null)
   const colVars=collection.vars||{}
+  const[selectedReqs,setSelectedReqs]=useState(()=>new Set(collection.requests.map(r=>r.id)))
 
   // Auto-detect all {{vars}} used across all requests in this collection
   const apiVars=[...new Set(
@@ -448,9 +625,10 @@ function CollectionRunner({collection,envVars,onClose}){
       // Merge CSV row vars for this iteration
       const rowVars=csvRows.length>0?csvRows[iter-1]:{}
       const ir={iter,requests:[],rowVars}
-      for(let ri=0;ri<collection.requests.length;ri++){
+      const reqsToRun=collection.requests.filter(r=>selectedReqs.has(r.id))
+      for(let ri=0;ri<reqsToRun.length;ri++){
         if(abortRef.current)break
-        const req=collection.requests[ri]
+        const req=reqsToRun[ri]
         setCurrent({iter,reqIdx:ri})
         const t0=Date.now()
         let status=0,statusText='',passed=false,error=null
@@ -542,11 +720,17 @@ function CollectionRunner({collection,envVars,onClose}){
             <input type="number" min={0} max={10000} value={delay} onChange={e=>setDelay(Number(e.target.value))} style={{width:'100%',background:'#f8f8fc',border:`1.5px solid ${C.border}`,borderRadius:7,padding:'7px 10px',fontSize:13,color:'#1a1a2e',outline:'none',fontFamily:C.mono,boxSizing:'border-box'}}/></div>
           <div style={{flex:1}}>
             <div style={{fontSize:11,color:'#94a3b8',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Requests</div>
-            {collection.requests.map((req,i)=>{const mc=MC[req.method]||MC.GET;const isAct=current&&current.reqIdx===i;return(
-              <div key={req.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',opacity:running&&!isAct?0.45:1}}>
+            <div style={{display:'flex',gap:6,marginBottom:4}}>
+              <button onClick={()=>setSelectedReqs(new Set(collection.requests.map(r=>r.id)))} style={{fontSize:10,color:C.pu,background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'inherit'}}>All</button>
+              <span style={{fontSize:10,color:'#cbd5e1'}}>|</span>
+              <button onClick={()=>setSelectedReqs(new Set())} style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'inherit'}}>None</button>
+            </div>
+            {collection.requests.map((req,i)=>{const mc=MC[req.method]||MC.GET;const isAct=current&&current.reqIdx===i;const sel=selectedReqs.has(req.id);return(
+              <div key={req.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 0',opacity:running&&!isAct?0.45:1,cursor:'pointer'}} onClick={()=>{if(!running){const s=new Set(selectedReqs);sel?s.delete(req.id):s.add(req.id);setSelectedReqs(s)}}}>
+                <input type="checkbox" checked={sel} onChange={()=>{}} style={{accentColor:C.pu,flexShrink:0,cursor:'pointer'}}/>
                 {isAct&&<div style={{width:6,height:6,borderRadius:'50%',background:C.amber,flexShrink:0,animation:'pulse 1s infinite'}}/>}
                 <span style={{fontSize:9,fontWeight:700,color:mc.text,background:mc.bg,border:`1px solid ${mc.border}`,borderRadius:3,padding:'1px 4px',fontFamily:C.mono,flexShrink:0}}>{req.method}</span>
-                <span style={{fontSize:11,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{req.name}</span>
+                <span style={{fontSize:11,color:sel?'#1a1a2e':'#94a3b8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{req.name}</span>
               </div>
             )})}
           </div>
@@ -662,6 +846,7 @@ export default function App(){
   const[showHist,setShowHist]=useState(false)
   const[showBackend,setShowBackend]=useState(false)
   const[runnerCol,setRunnerCol]=useState(null)
+  const[csvRunReq,setCsvRunReq]=useState(null)
   const[importError,setImportError]=useState(null)
   const importRef=useRef(null)
 
@@ -756,6 +941,7 @@ export default function App(){
             <RequestEditor request={activeReq} onUpdate={updateReq} onSend={sendReq} loading={loading} envVars={envVars}
               collectionVars={activeCol?.vars||{}}
               onUpdateCollectionVar={(key,val)=>setCollections(cs=>cs.map(c=>c.id===activeCol?.id?{...c,vars:{...c.vars,[key]:val}}:c))}
+              onOpenCsvRunner={()=>setCsvRunReq(activeReq)}
             />
           </div>
           <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -776,6 +962,7 @@ export default function App(){
     {showEnv&&<div onClick={()=>setShowEnv(false)} style={{position:'fixed',inset:0,zIndex:199}}/>}
     {showHist&&<HistoryPanel history={history} onSelect={h=>{if(h.reqId)setActiveId(h.reqId)}} onClose={()=>setShowHist(false)}/>}
     {showBackend&&<BackendSettings onClose={()=>setShowBackend(false)}/>}
+    {csvRunReq&&<SingleRequestRunner request={csvRunReq} envVars={envVars} collectionVars={activeCol?.vars||{}} onClose={()=>setCsvRunReq(null)}/> }
     {runnerCol&&<CollectionRunner collection={runnerCol} envVars={envVars} onClose={()=>setRunnerCol(null)}/>}
   </div>)
 }
