@@ -210,7 +210,7 @@ function ResponseViewer({response,loading,elapsed}){
   const viewBtn=(v)=>({padding:'3px 9px',borderRadius:5,fontSize:11,cursor:'pointer',fontFamily:'inherit',border:view===v?`1.5px solid ${C.pu}`:`1px solid ${C.border}`,background:view===v?'rgba(124,106,247,0.06)':'#fff',color:view===v?C.pu:'#64748b'})
   return(<div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
     <div style={{display:'flex',gap:14,alignItems:'center',padding:'9px 16px',borderBottom:`1px solid ${C.border}`,background:'#f8f8fc',flexShrink:0}}>
-      <span style={{fontSize:13,fontWeight:700,color:sc,background:`${sc}15`,border:`1px solid ${sc}35`,borderRadius:6,padding:'3px 10px',fontFamily:C.mono}}>{response.status} {response.statusText}</span>
+      <span style={{fontSize:13,fontWeight:700,color:sc,background:`${sc}15`,border:`1px solid ${sc}55`,borderRadius:6,padding:'3px 10px',fontFamily:C.mono}}>{response.status} {response.statusText}</span>
       <span style={{fontSize:12,color:'#94a3b8'}}>{elapsed}ms</span>
       <span style={{fontSize:12,color:'#94a3b8'}}>{response.size}</span>
       <div style={{marginLeft:'auto',display:'flex',gap:6}}>
@@ -537,7 +537,7 @@ function SingleRequestRunner({request,envVars,collectionVars,onClose}){
               {[['Total',results.length,'#1a1a2e'],['Passed',passed,C.green],['Failed',failed,C.red]].map(([l,v,c])=>(
                 <div key={l} style={{display:'flex',alignItems:'center',gap:5}}>
                   <span style={{fontSize:11,color:'#94a3b8',fontWeight:600}}>{l}</span>
-                  <span style={{fontSize:13,fontWeight:700,color:c,background:c+'18',borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{v}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:c,background:`${c}18`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{v}</span>
                 </div>
               ))}
               {running&&<span style={{marginLeft:'auto',fontSize:11,color:'#94a3b8'}}>Running {results.length}/{csvRows.length||1}…</span>}
@@ -559,7 +559,7 @@ function SingleRequestRunner({request,envVars,collectionVars,onClose}){
                     {Object.keys(r.rowVars||{}).length===0&&<span style={{fontSize:10,color:'#cbd5e1'}}>—</span>}
                   </div>
                 </td>
-                <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:sc+'18',border:`1px solid ${sc}44`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
+                <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}18`,border:`1px solid ${sc}55`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
                 <td style={{padding:'8px 12px'}}>
                   {r.error?<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:'1px solid rgba(220,38,38,0.25)',borderRadius:5,padding:'3px 9px'}}>✗ Error</span>
                     :r.passed?<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:'1px solid rgba(22,163,74,0.25)',borderRadius:5,padding:'3px 9px'}}>✓ Passed</span>
@@ -774,7 +774,7 @@ function CollectionRunner({collection,envVars,onClose}){
                   return(<tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
                     <td style={{padding:'8px 12px',fontSize:12,color:'#1a1a2e',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</td>
                     <td style={{padding:'8px 12px'}}><span style={{fontSize:9,fontWeight:700,color:mc.text,background:mc.bg,border:`1px solid ${mc.border}`,borderRadius:3,padding:'1px 5px',fontFamily:C.mono}}>{r.method}</span></td>
-                    <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}15`,border:`1px solid ${sc}35`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
+                    <td style={{padding:'8px 12px'}}>{r.status>0?<span style={{fontSize:11,fontWeight:700,color:sc,background:`${sc}15`,border:`1px solid ${sc}55`,borderRadius:5,padding:'2px 8px',fontFamily:C.mono}}>{r.status} {r.statusText}</span>:<span style={{color:C.red,fontSize:11}}>—</span>}</td>
                     <td style={{padding:'8px 12px'}}>
                       {r.error?<span style={{fontSize:11,fontWeight:700,color:C.red,background:'rgba(220,38,38,0.1)',border:`1px solid rgba(220,38,38,0.25)`,borderRadius:5,padding:'3px 10px'}}>✗ Error</span>
                         :r.passed?<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(22,163,74,0.1)',border:`1px solid rgba(22,163,74,0.25)`,borderRadius:5,padding:'3px 10px'}}>✓ Passed</span>
