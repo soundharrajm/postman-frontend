@@ -61,11 +61,11 @@ function newRequest() {
 }
 
 function newCollection(name = 'New Collection') {
-  return { id:uid(), name, requests:[] }
+  return { id:uid(), name, requests:[], vars:{} }
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────
-function Sidebar({ collections, activeId, onSelect, onNew, onNewCollection, onDeleteRequest, onRenameCollection, onDeleteCollection, onImport }) {
+function Sidebar({ collections, activeId, onSelect, onNew, onNewCollection, onDeleteRequest, onRenameCollection, onDeleteCollection, onImport, onRun }) {
   const [expanded, setExpanded] = useState({})
   const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }))
   const [editingCol, setEditingCol] = useState(null)
@@ -378,12 +378,12 @@ function HistoryPanel({ history, onSelect, onClose }) {
 }
 
 // ── Main RequestEditor ─────────────────────────────────────────────────
-function RequestEditor({ request, onUpdate, onSend, loading, envVars }) {
+function RequestEditor({ request, onUpdate, onSend, loading, envVars, collectionVars, onUpdateCollectionVar }) {
   const [tab, setTab] = useState('params')
   const mc = METHOD_COLORS[request.method] || METHOD_COLORS.GET
 
   // Resolve env vars in URL
-  const resolveEnv = (str) => str.replace(/\{\{(\w+)\}\}/g, (_, k) => envVars[k] || `{{${k}}}`)
+  const resolveEnv = (str) => str.replace(/\{\{(\w+)\}\}/g, (_, k) => collectionVars?.[k] ?? envVars[k] ?? `{{${k}}}`)
   const resolvedUrl = resolveEnv(request.url)
 
   // Build URL with params
@@ -417,32 +417,24 @@ function RequestEditor({ request, onUpdate, onSend, loading, envVars }) {
           {METHODS.map(m => <option key={m} value={m} style={{ background:C.card }}>{m}</option>)}
         </select>
 
-        <div style={{ flex:1, position:'relative' }}>
-          <input value={request.url} onChange={e=>onUpdate({...request,url:e.target.value})}
-            placeholder="https://api.example.com/...  or paste a cURL command"
-            onKeyDown={e=>{ if(e.key==='Enter') onSend(urlWithParams()) }}
-            onPaste={e=>{
-              const pasted = e.clipboardData.getData('text')
-              if (pasted.trimStart().startsWith('curl')) {
-                e.preventDefault()
-                try {
-                  const parsed = parseCurl(pasted)
-                  onUpdate({
-                    ...request,
-                    method:  parsed.method,
-                    url:     parsed.url,
-                    headers: parsed.headers.length ? parsed.headers : request.headers,
-                    body:    parsed.body || request.body,
-                    bodyType:parsed.body ? 'json' : request.bodyType,
-                  })
-                } catch(_) { /* fall through to normal paste */ }
-              }
-            }}
-            style={{ width:'100%', background:'rgba(255,255,255,0.05)', border:`1px solid ${C.border}`, borderRadius:8, padding:'10px 14px', fontSize:13, color:'#e8e8f0', outline:'none', fontFamily:C.mono, boxSizing:'border-box' }} />
-          {resolvedUrl !== request.url && (
-            <div style={{ position:'absolute', bottom:-18, left:0, fontSize:10, color:'#555', fontFamily:C.mono, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'80%' }}>→ {resolvedUrl}</div>
-          )}
-        </div>
+        <SmartUrlBar
+          value={request.url}
+          onChange={url => {
+            // Also handle curl paste at this level
+            if (url.trimStart?.().startsWith('curl')) {
+              try {
+                const parsed = parseCurl(url)
+                onUpdate({ ...request, method:parsed.method, url:parsed.url, headers:parsed.headers.length?parsed.headers:request.headers, body:parsed.body||request.body, bodyType:parsed.body?'json':request.bodyType })
+                return
+              } catch(_) {}
+            }
+            onUpdate({ ...request, url })
+          }}
+          onSend={() => onSend(urlWithParams())}
+          envVars={envVars}
+          collectionVars={collectionVars}
+          onUpdateCollectionVar={onUpdateCollectionVar}
+        />
 
         <button onClick={()=>onSend(urlWithParams())} disabled={loading||!request.url.trim()} style={{
           padding:'10px 28px', borderRadius:8, fontSize:13, fontWeight:700, cursor:loading||!request.url.trim()?'not-allowed':'pointer', fontFamily:'inherit', border:'none',
@@ -519,6 +511,7 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false)
   const [showBackendSettings, setShowBackendSettings] = useState(false)
   const [importError, setImportError]         = useState(null)
+  const [runnerCol, setRunnerCol]             = useState(null)
   const importFileRef = useRef(null)
 
   // Persist
@@ -681,6 +674,7 @@ export default function App() {
           onRenameCollection={(id,name)=>setCollections(cs=>cs.map(c=>c.id===id?{...c,name}:c))}
           onDeleteCollection={(id)=>setCollections(cs=>cs.filter(c=>c.id!==id))}
           onImport={()=>importFileRef.current?.click()}
+          onRun={(id)=>setRunnerCol(collections.find(c=>c.id===id))}
         />
 
         {/* ── Request + Response pane ── */}
@@ -688,7 +682,21 @@ export default function App() {
           <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
             {/* Top half: request editor */}
             <div style={{ flex:'0 0 55%', display:'flex', flexDirection:'column', borderBottom:`2px solid ${C.border}`, overflow:'hidden' }}>
-              <RequestEditor request={activeReq} onUpdate={updateRequest} onSend={sendRequest} loading={loading} envVars={envVars} />
+              <RequestEditor
+                request={activeReq}
+                onUpdate={updateRequest}
+                onSend={sendRequest}
+                loading={loading}
+                envVars={envVars}
+                collectionVars={collections.find(c=>c.requests.some(r=>r.id===activeReqId))?.vars || {}}
+                onUpdateCollectionVar={(key,val) => {
+                  setCollections(cs => cs.map(c =>
+                    c.requests.some(r=>r.id===activeReqId)
+                      ? { ...c, vars:{ ...c.vars, [key]:val } }
+                      : c
+                  ))
+                }}
+              />
             </div>
             {/* Bottom half: response */}
             <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -719,6 +727,7 @@ export default function App() {
 
       {showHistory && <HistoryPanel history={history} onSelect={loadFromHistory} onClose={()=>setShowHistory(false)} />}
       {showBackendSettings && <BackendSettings onClose={()=>setShowBackendSettings(false)} />}
+      {runnerCol && <CollectionRunner collection={runnerCol} envVars={envVars} onClose={()=>setRunnerCol(null)} getApiUrl={getApiUrl} />}
     </div>
   )
 }
