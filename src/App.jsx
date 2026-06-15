@@ -327,6 +327,27 @@ function RequestEditor({request,onUpdate,onSend,loading,envVars,collectionVars,o
       <button onClick={()=>onSend(urlWithParams())} disabled={loading||!request.url.trim()} style={{padding:'10px 28px',borderRadius:8,fontSize:13,fontWeight:700,cursor:loading||!request.url.trim()?'not-allowed':'pointer',fontFamily:'inherit',border:'none',background:loading||!request.url.trim()?'rgba(124,106,247,0.3)':C.pu,color:'#fff',flexShrink:0}}>
         {loading?'⏳':'Send'}
       </button>
+      <button onClick={()=>{
+        const url=urlWithParams()
+        const hdrs=request.headers.filter(h=>h.enabled&&h.key).map(h=>`  -H '${h.key}: ${h.value}'`).join(' \\
+')
+        const auth=request.auth
+        let authFlag=''
+        if(auth.type==='bearer'&&auth.token) authFlag=`  -H 'Authorization: Bearer ${auth.token}' \\
+`
+        if(auth.type==='basic'&&auth.username) authFlag=`  -u '${auth.username}:${auth.password}' \\
+`
+        if(auth.type==='apikey'&&auth.key&&auth.in==='header') authFlag=`  -H '${auth.key}: ${auth.value}' \\
+`
+        const bodyFlag=request.body&&request.bodyType!=='none'?`  -d '${request.body}' \\
+`:''
+        const curl=`curl -X ${request.method} '${url}' \\
+${authFlag}${hdrs?hdrs+' \\
+':''}${bodyFlag}  --compressed`
+        navigator.clipboard.writeText(curl)
+      }} title="Copy as cURL" style={{padding:'10px 12px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:`1px solid ${C.border}`,background:'#f8f8fc',color:'#64748b',flexShrink:0}}>
+        📋 cURL
+      </button>
       <button onClick={onOpenCsvRunner} style={{padding:'10px 14px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${C.pu}`,background:'rgba(124,106,247,0.06)',color:C.pu,flexShrink:0}}>
         📊 CSV Run
       </button>
