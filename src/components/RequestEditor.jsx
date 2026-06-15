@@ -14,9 +14,17 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
   const urlWithParams = () => {
     const en = (request.params || []).filter(p => p.enabled && p.key)
     if (!en.length) return resolve(request.url)
+    // Parse existing URL to avoid duplicating params already in the URL
+    let base = resolve(request.url)
+    let existingKeys = []
+    try {
+      const u = new URL(base)
+      existingKeys = [...u.searchParams.keys()]
+      // Strip existing query string — params tab is source of truth
+      base = u.origin + u.pathname
+    } catch {}
     const qs = en.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(resolve(p.value))}`).join('&')
-    const base = resolve(request.url)
-    return `${base}${base.includes('?') ? '&' : '?'}${qs}`
+    return `${base}?${qs}`
   }
 
   const tabBtn = (t, label) => ({
@@ -53,6 +61,20 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
             if (url.trimStart?.().startsWith('curl')) {
               try { const c = parseCurl(url); onUpdate({ ...request, method: c.method, url: c.url, headers: c.headers.length ? c.headers : request.headers, body: c.body || request.body, bodyType: c.body ? 'json' : request.bodyType }); return } catch {}
             }
+            // Auto-parse query params from URL into Params tab (like Postman)
+            try {
+              const u = new URL(url)
+              if (u.search) {
+                const newParams = []
+                u.searchParams.forEach((v, k) => newParams.push({ id: Math.random().toString(36).slice(2), key: k, value: v, enabled: true }))
+                if (newParams.length) {
+                  const baseUrl = u.origin + u.pathname
+                  const existingNonEmpty = (request.params || []).filter(p => p.key && !newParams.find(np => np.key === p.key))
+                  onUpdate({ ...request, url: baseUrl, params: [...newParams, ...existingNonEmpty, { id: Math.random().toString(36).slice(2), key: '', value: '', enabled: true }] })
+                  return
+                }
+              }
+            } catch {}
             onUpdate({ ...request, url })
           }}
           onSend={() => onSend(urlWithParams())}
