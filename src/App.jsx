@@ -5,6 +5,8 @@ const getApiUrl = () =>
   import.meta.env.VITE_API_URL ||
   'http://localhost:8000'
 
+
+
 // ── Design tokens ───────────────────────────────────────────────────────────
 const C = {
   bg:'#ffffff', panel:'#f8f8fc', card:'#f0f0f8',
@@ -887,6 +889,8 @@ function BackendSettings({onClose,onSaved}){
 const SK='apiforge_collections', EK='apiforge_envs', HK='apiforge_history'
 
 export default function App(){
+
+
   const[collections,setCollections]=useState(()=>{try{return JSON.parse(localStorage.getItem(SK))||[]}catch{return[]}})
   const[activeId,setActiveId]=useState(null)
   const[responses,setResponses]=useState({})
@@ -917,9 +921,9 @@ export default function App(){
   const[importError,setImportError]=useState(null)
   const importRef=useRef(null)
 
-  useEffect(()=>{localStorage.setItem(SK,JSON.stringify(collections))},[collections])
-  useEffect(()=>{localStorage.setItem(EK,JSON.stringify(envs))},[envs])
-  useEffect(()=>{localStorage.setItem(HK,JSON.stringify(history))},[history])
+  useEffect(()=>{ localStorage.setItem(SK,JSON.stringify(collections)) },[collections])
+  useEffect(()=>{ localStorage.setItem(EK,JSON.stringify(envs)) },[envs])
+  useEffect(()=>{ localStorage.setItem(HK,JSON.stringify(history)) },[history])
 
   const envVars={}
   const ae=envs.find(e=>e.id===activeEnv)
