@@ -1,4 +1,26 @@
+import { useState } from 'react'
 import { C } from '../constants.js'
+
+function BearerInput({ value, onChange, inp }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Bearer token"
+        style={{ ...inp, paddingRight: 36 }}
+      />
+      <button onClick={() => setShow(v => !v)} style={{
+        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+        background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14, padding: 0,
+      }} title={show ? 'Hide token' : 'Show token'}>
+        {show ? '🙈' : '👁'}
+      </button>
+    </div>
+  )
+}
 
 export default function AuthEditor({ auth, onChange }) {
   const set = (k, v) => onChange({ ...auth, [k]: v })

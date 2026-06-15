@@ -79,9 +79,19 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 6, padding: '4px 16px 10px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-        {['params', 'headers', 'body', 'auth'].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={tabBtn(t, t.charAt(0).toUpperCase() + t.slice(1))}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+        {[
+          { key: 'params',  label: 'Params',  count: request.params.filter(p=>p.enabled&&p.key).length },
+          { key: 'headers', label: 'Headers', count: request.headers.filter(h=>h.enabled&&h.key).length },
+          { key: 'body',    label: 'Body',    count: 0 },
+          { key: 'auth',    label: 'Auth',    count: request.auth.type !== 'none' ? 1 : 0 },
+        ].map(({ key, label, count }) => (
+          <button key={key} onClick={() => setTab(key)} style={tabBtn(key, label)}>
+            {label}
+            {count > 0 && (
+              <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: tab === key ? C.pu : '#fff', background: tab === key ? 'rgba(124,106,247,0.2)' : '#94a3b8', borderRadius: 10, padding: '1px 6px', minWidth: 16, display: 'inline-block', textAlign: 'center' }}>
+                {count}
+              </span>
+            )}
           </button>
         ))}
       </div>
