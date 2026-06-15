@@ -10,6 +10,7 @@ import CollectionRunner from './components/CollectionRunner.jsx'
 import HistoryPanel     from './components/HistoryPanel.jsx'
 import EnvPanel         from './components/EnvPanel.jsx'
 import BackendSettings  from './components/BackendSettings.jsx'
+import ResizablePanes  from './components/ResizablePanes.jsx'
 
 export default function App() {
   // ── State ──────────────────────────────────────────────────────────────────
@@ -236,9 +237,8 @@ export default function App() {
         />
 
         {activeReq ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Request editor */}
-            <div style={{ flex: '0 0 50%', display: 'flex', flexDirection: 'column', borderBottom: `2px solid ${C.border}`, overflow: 'hidden' }}>
+          <ResizablePanes
+            top={
               <RequestEditor
                 request={activeReq}
                 onUpdate={updateReq}
@@ -249,15 +249,13 @@ export default function App() {
                 onUpdateCollectionVar={(key, val) => setCollections(cs => cs.map(c => c.id === activeCol?.id ? { ...c, vars: { ...c.vars, [key]: val } } : c))}
                 onOpenCsvRunner={() => setCsvRunReq(csvRunReq ? null : activeReq)}
               />
-            </div>
-            {/* Response / CSV runner */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              {csvRunReq && csvRunReq.id === activeId
+            }
+            bottom={
+              csvRunReq && csvRunReq.id === activeId
                 ? <InlineCsvRunner request={activeReq} envVars={envVars} collectionVars={activeCol?.vars || {}} onClose={() => setCsvRunReq(null)} />
                 : <ResponseViewer response={responses[activeId]} loading={loading} elapsed={elapsed} />
-              }
-            </div>
-          </div>
+            }
+          />
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, color: '#cbd5e1' }}>
             <div style={{ fontSize: 64 }}>⚡</div>
