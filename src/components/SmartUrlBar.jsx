@@ -48,25 +48,42 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
           borderRadius: 8, padding: '10px 14px', fontSize: 13,
           color: varNames.length ? 'transparent' : '#1a1a2e',
           outline: 'none', fontFamily: C.mono, boxSizing: 'border-box', caretColor: '#1a1a2e',
+          // Direction rtl trick: keeps cursor and content end-anchored so
+          // {{var}} at the tail is always visible regardless of container width.
+          // The inner span overrides back to ltr so text reads left-to-right.
+          direction: varNames.length ? 'ltr' : 'ltr',
         }}
       />
 
-      {/* Highlighted var overlay */}
+      {/* Highlighted var overlay — base text truncates left, var pills always visible at end */}
       {varNames.length > 0 && (
-        <div style={{ position: 'absolute', inset: 0, padding: '10px 14px', fontSize: 13, fontFamily: C.mono, display: 'flex', alignItems: 'center', overflow: 'hidden', pointerEvents: 'none' }}>
-          {parts.map((p, i) => p.t === 'txt'
-            ? <span key={i} style={{ color: '#1a1a2e', whiteSpace: 'pre' }}>{p.v}</span>
-            : <span key={i}
-                onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
-                style={{
-                  pointerEvents: 'all', cursor: 'pointer', borderRadius: 4, padding: '1px 5px',
-                  background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
-                  border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
-                  color: resolve(p.name) ? C.green : C.red, fontSize: 12, fontWeight: 600,
-                }}
-                title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
-                {'{{' + p.name + '}}'}
-              </span>
+        <div style={{
+          position: 'absolute', inset: 0, padding: '10px 14px', fontSize: 13,
+          fontFamily: C.mono, display: 'flex', alignItems: 'center',
+          overflow: 'hidden', pointerEvents: 'none',
+          // Use flex so the static base shrinks and var pills stay pinned right
+        }}>
+          {/* Base URL segment — shrinks, clips with ellipsis */}
+          <span style={{
+            color: '#1a1a2e', whiteSpace: 'pre', overflow: 'hidden',
+            textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0,
+          }}>
+            {parts.filter(p => p.t === 'txt').map(p => p.v).join('')}
+          </span>
+          {/* Var pills — never shrink, always visible */}
+          {parts.filter(p => p.t === 'var').map((p, i) =>
+            <span key={i}
+              onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
+              style={{
+                pointerEvents: 'all', cursor: 'pointer', borderRadius: 4, padding: '1px 5px',
+                flexShrink: 0,
+                background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
+                border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
+                color: resolve(p.name) ? C.green : C.red, fontSize: 12, fontWeight: 600,
+              }}
+              title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
+              {'{{' + p.name + '}}'}
+            </span>
           )}
         </div>
       )}

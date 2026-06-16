@@ -12,6 +12,8 @@ export default function CollectionRunner({ collection, envVars, onClose }) {
   const [csvHeaders,  setCsvHeaders]  = useState([])
   const [csvFile,     setCsvFile]     = useState(null)
   const [selectedReqs, setSelectedReqs] = useState(() => new Set(collection.requests.map(r => r.id)))
+  const [expandedKey,  setExpandedKey]  = useState(null)   // 'iterIdx-reqIdx'
+  const [quoteIds,     setQuoteIds]     = useState(false)
   const abortRef = useRef(false)
   const csvRef   = useRef(null)
 
@@ -54,7 +56,7 @@ export default function CollectionRunner({ collection, envVars, onClose }) {
         const req = reqsToRun[ri]
         setCurrent({ iter, reqIdx: ri })
         const t0 = Date.now()
-        let status = 0, statusText = '', passed = false, error = null
+        let status = 0, statusText = '', passed = false, error = null, rawBody = null
 
         try {
           let url = resolve(req.url, rowVars)
@@ -78,9 +80,10 @@ export default function CollectionRunner({ collection, envVars, onClose }) {
           const r = await fetch(getApiUrl() + '/proxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, method: req.method, headers: hdrs, body }) })
           const d = await r.json()
           status = d.status; statusText = d.status_text; passed = status >= 200 && status < 300
+          rawBody = d.body ?? null
         } catch (e) { error = e.message; passed = false }
 
-        ir.requests.push({ name: req.name, method: req.method, status, statusText, passed, error, elapsed: Date.now() - t0 })
+        ir.requests.push({ name: req.name, method: req.method, status, statusText, passed, error, elapsed: Date.now() - t0, rawBody: rawBody ?? null })
         if (delay > 0) await new Promise(r => setTimeout(r, delay))
       }
 
@@ -199,6 +202,13 @@ export default function CollectionRunner({ collection, envVars, onClose }) {
                   </div>
                 ))}
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8' }}>{running ? `Running ${results.length + 1}/${csvRows.length || iterations}…` : `${results.length}/${csvRows.length || iterations} done`}</span>
+                {/* " " IDs toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>" " IDs</span>
+                  <div onClick={() => setQuoteIds(v => !v)} style={{ width: 32, height: 18, borderRadius: 9, background: quoteIds ? C.pu : C.border, cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: quoteIds ? 17 : 3, transition: 'left .2s' }} />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -231,26 +241,70 @@ export default function CollectionRunner({ collection, envVars, onClose }) {
                   </thead>
                   <tbody>
                     {iter.requests.map((r, i) => {
-                      const mc = MC[r.method] || MC.GET
-                      const sc = SC(r.status)
+                      const mc  = MC[r.method] || MC.GET
+                      const sc  = SC(r.status)
+                      const key = `${iter.iter}-${i}`
+                      const isOpen = expandedKey === key
+
+                      // Format body with optional ID quoting
+                      let prettyBody = r.rawBody ?? ''
+                      if (prettyBody) {
+                        try {
+                          let parsed = JSON.parse(prettyBody)
+                          if (quoteIds) {
+                            const quoteIdFields = (obj) => {
+                              if (Array.isArray(obj)) return obj.map(quoteIdFields)
+                              if (obj && typeof obj === 'object') {
+                                return Object.fromEntries(Object.entries(obj).map(([k, v]) => {
+                                  if (/^(id|_id|uuid|guid)$/i.test(k) && (typeof v === 'number' || typeof v === 'string')) return [k, String(v)]
+                                  return [k, quoteIdFields(v)]
+                                }))
+                              }
+                              return obj
+                            }
+                            parsed = quoteIdFields(parsed)
+                          }
+                          prettyBody = JSON.stringify(parsed, null, 2)
+                        } catch {}
+                      }
+
                       return (
-                        <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
-                          <td style={{ padding: '8px 12px', fontSize: 12, color: '#1a1a2e', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</td>
-                          <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 9, fontWeight: 700, color: mc.text, background: mc.bg, border: `1px solid ${mc.border}`, borderRadius: 3, padding: '1px 5px', fontFamily: C.mono }}>{r.method}</span></td>
-                          <td style={{ padding: '8px 12px' }}>
-                            {r.status > 0
-                              ? <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: sc + '15', border: `1px solid ${sc}55`, borderRadius: 5, padding: '2px 8px', fontFamily: C.mono }}>{r.status} {r.statusText}</span>
-                              : <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>}
-                          </td>
-                          <td style={{ padding: '8px 12px' }}>
-                            {r.error
-                              ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 10px' }}>✗ Error</span>
-                              : r.passed
-                                ? <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 5, padding: '3px 10px' }}>✓ Passed</span>
-                                : <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 10px' }}>✗ Failed</span>}
-                          </td>
-                          <td style={{ padding: '8px 12px', fontSize: 11, color: '#94a3b8', fontFamily: C.mono }}>{r.elapsed}ms</td>
-                        </tr>
+                        <>
+                          <tr key={key} onClick={() => setExpandedKey(isOpen ? null : key)}
+                            style={{ borderBottom: isOpen ? 'none' : `1px solid ${C.border}`, cursor: 'pointer', background: isOpen ? 'rgba(124,106,247,0.04)' : 'transparent' }}
+                            onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = '#f8f8fc' }}
+                            onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = 'transparent' }}>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: '#1a1a2e', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ marginRight: 6, fontSize: 10, color: '#94a3b8' }}>{isOpen ? '▾' : '▸'}</span>{r.name}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 9, fontWeight: 700, color: mc.text, background: mc.bg, border: `1px solid ${mc.border}`, borderRadius: 3, padding: '1px 5px', fontFamily: C.mono }}>{r.method}</span></td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {r.status > 0
+                                ? <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: sc + '15', border: `1px solid ${sc}55`, borderRadius: 5, padding: '2px 8px', fontFamily: C.mono }}>{r.status} {r.statusText}</span>
+                                : <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {r.error
+                                ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 10px' }}>✗ Error</span>
+                                : r.passed
+                                  ? <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 5, padding: '3px 10px' }}>✓ Passed</span>
+                                  : <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 10px' }}>✗ Failed</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, color: '#94a3b8', fontFamily: C.mono }}>{r.elapsed}ms</td>
+                          </tr>
+                          {isOpen && (
+                            <tr key={key + '-body'}>
+                              <td colSpan={5} style={{ padding: 0, borderBottom: `1px solid ${C.border}` }}>
+                                <div style={{ background: '#f8f8fc', borderTop: `1px solid ${C.border}`, padding: '10px 14px' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Response body</div>
+                                  <pre style={{ margin: 0, fontSize: 11, fontFamily: C.mono, color: '#1a1a2e', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 260, overflowY: 'auto', lineHeight: 1.6 }}>
+                                    {prettyBody || (r.error ? `Error: ${r.error}` : '(empty)')}
+                                  </pre>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       )
                     })}
                   </tbody>
