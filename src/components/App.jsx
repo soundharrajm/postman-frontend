@@ -196,37 +196,30 @@ export default function App() {
         <button onClick={() => newReq(null)} style={{ fontSize: 11, padding: '5px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>+ New Request</button>
         <div style={{ flex: 1 }} />
 
-        <select value={activeEnv || ''} onChange={e => setActiveEnv(e.target.value || null)} style={{ background: '#f8f8fc', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 10px', fontSize: 11, color: activeEnv ? C.pu : '#94a3b8', outline: 'none', cursor: 'pointer' }}>
+        <select value={activeEnv || ''} onChange={e => setActiveEnv(e.target.value || null)} style={{ background: '#f8f8fc', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', fontSize: 11, color: activeEnv ? C.pu : '#94a3b8', outline: 'none', cursor: 'pointer', maxWidth: 130 }}>
           <option value="">No Environment</option>
           {envs.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
 
-        <button onClick={() => setShowEnv(true)}  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 7, border: `1px solid rgba(124,106,247,0.25)`, background: 'rgba(124,106,247,0.06)', color: C.pu, cursor: 'pointer', fontFamily: 'inherit' }}>⚙ Environments</button>
-        <button onClick={() => setShowIdTool(true)} title="ID Extractor" style={{ fontSize: 13, padding: '5px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>🔑</button>
-        <button onClick={() => setShowHist(true)} style={{ fontSize: 11, padding: '5px 12px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>🕐 History</button>
-
-        {/* Export */}
+        <button onClick={() => setShowEnv(true)} title="Environments" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid rgba(124,106,247,0.25)`, background: 'rgba(124,106,247,0.06)', color: C.pu, cursor: 'pointer', fontFamily: 'inherit' }}>⚙ Env</button>
+        <button onClick={() => setShowIdTool(true)} title="ID Extractor" style={{ fontSize: 13, padding: '5px 9px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer' }}>🔑</button>
+        <button onClick={() => setShowHist(true)} title="History" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>🕐</button>
         <button onClick={() => {
           const data = { collections, history, envs, exportedAt: new Date().toISOString() }
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
           const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'apiforge-backup.json'; a.click()
-        }} style={{ fontSize: 11, padding: '5px 11px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>↓ Export</button>
-
-        {/* Import */}
-        <label style={{ fontSize: 11, padding: '5px 11px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center' }}>
-          ↑ Import
-          <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+        }} title="Export backup" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>↓</button>
+        <label title="Import backup" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center' }}>
+          ↑<input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
         </label>
-
-        {/* Backend status */}
-        <button onClick={() => setShowBackend(true)} style={{
-          fontSize: 11, padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5,
-          border:      backendOk === true ? '1px solid rgba(22,163,74,0.3)' : backendOk === false ? '1px solid rgba(220,38,38,0.3)' : '1px solid rgba(124,106,247,0.25)',
-          background:  backendOk === true ? 'rgba(22,163,74,0.06)'         : backendOk === false ? 'rgba(220,38,38,0.06)'           : 'rgba(124,106,247,0.06)',
-          color:       backendOk === true ? C.green                         : backendOk === false ? C.red                            : C.pu,
+        <button onClick={() => setShowBackend(true)} title="Backend settings" style={{
+          fontSize: 11, padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4,
+          border:     backendOk === true ? '1px solid rgba(22,163,74,0.3)' : backendOk === false ? '1px solid rgba(220,38,38,0.3)' : '1px solid rgba(124,106,247,0.25)',
+          background: backendOk === true ? 'rgba(22,163,74,0.06)'         : backendOk === false ? 'rgba(220,38,38,0.06)'           : 'rgba(124,106,247,0.06)',
+          color:      backendOk === true ? C.green                         : backendOk === false ? C.red                            : C.pu,
         }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: backendOk === true ? C.green : backendOk === false ? C.red : '#94a3b8', display: 'inline-block', flexShrink: 0 }} />
-          Backend
+          BE
         </button>
       </div>
 
