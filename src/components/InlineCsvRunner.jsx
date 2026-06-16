@@ -9,6 +9,7 @@ export default function InlineCsvRunner({ request, envVars, collectionVars, onCl
   const [running,    setRunning]    = useState(false)
   const [results,    setResults]    = useState([])
   const [delay,      setDelay]      = useState(0)
+  const [expandedRow, setExpandedRow] = useState(null)  // row index
   const abortRef = useRef(false)
   const csvRef   = useRef(null)
 
@@ -26,14 +27,14 @@ export default function InlineCsvRunner({ request, envVars, collectionVars, onCl
   }
 
   const runAll = async () => {
-    setRunning(true); setResults([]); abortRef.current = false
+    setRunning(true); setResults([]); setExpandedRow(null); abortRef.current = false
     const rows = csvRows.length > 0 ? csvRows : [{}]
     const all = []
 
     for (let i = 0; i < rows.length; i++) {
       if (abortRef.current) break
       const rv = rows[i]; const t0 = Date.now()
-      let status = 0, statusText = '', passed = false, error = null
+      let status = 0, statusText = '', passed = false, error = null, rawBody = null
 
       try {
         let url = resolve(request.url, rv)
@@ -55,10 +56,12 @@ export default function InlineCsvRunner({ request, envVars, collectionVars, onCl
         }
 
         const r = await fetch(getApiUrl() + '/proxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, method: request.method, headers: hdrs, body }) })
-        const d = await r.json(); status = d.status; statusText = d.status_text; passed = status >= 200 && status < 300
+        const d = await r.json()
+        status = d.status; statusText = d.status_text; passed = status >= 200 && status < 300
+        rawBody = d.body ?? null
       } catch (e) { error = e.message; passed = false }
 
-      all.push({ row: i + 1, rowVars: rv, status, statusText, passed, error, elapsed: Date.now() - t0 })
+      all.push({ row: i + 1, rowVars: rv, status, statusText, passed, error, elapsed: Date.now() - t0, rawBody })
       setResults([...all])
       if (delay > 0 && i < rows.length - 1) await new Promise(r => setTimeout(r, delay))
     }
@@ -81,7 +84,6 @@ export default function InlineCsvRunner({ request, envVars, collectionVars, onCl
           {csvFile ? '📄 ' + csvFile : '↑ Upload CSV'}
         </button>
 
-        {/* Var mapping pills */}
         {csvHeaders.length > 0 && apiVars.map(v => (
           <span key={v} style={{ fontSize: 10, fontFamily: C.mono, padding: '2px 6px', borderRadius: 4, background: csvHeaders.includes(v) ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)', border: `1px solid ${csvHeaders.includes(v) ? 'rgba(22,163,74,0.25)' : 'rgba(220,38,38,0.25)'}`, color: csvHeaders.includes(v) ? C.green : C.red }}>
             {`{{${v}}}`} {csvHeaders.includes(v) ? '✓' : '✗'}
@@ -132,30 +134,57 @@ export default function InlineCsvRunner({ request, envVars, collectionVars, onCl
             <tbody>
               {results.map((r, i) => {
                 const sc = SC(r.status)
+                const isOpen = expandedRow === i
+
+                // pretty print body
+                let prettyBody = r.rawBody ?? ''
+                try { prettyBody = JSON.stringify(JSON.parse(prettyBody), null, 2) } catch {}
+
                 return (
-                  <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: '8px 14px', fontSize: 12, color: '#94a3b8', fontFamily: C.mono, width: 40 }}>{r.row}</td>
-                    <td style={{ padding: '8px 14px' }}>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {Object.entries(r.rowVars || {}).map(([k, v]) => (
-                          <span key={k} style={{ fontSize: 10, fontFamily: C.mono, background: 'rgba(124,106,247,0.06)', border: '1px solid rgba(124,106,247,0.15)', borderRadius: 3, padding: '1px 5px', color: C.pu }}>{k}=<b>{v}</b></span>
-                        ))}
-                      </div>
-                    </td>
-                    <td style={{ padding: '8px 14px' }}>
-                      {r.status > 0
-                        ? <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: sc + '12', border: `1px solid ${sc}30`, borderRadius: 5, padding: '2px 8px', fontFamily: C.mono }}>{r.status} {r.statusText}</span>
-                        : <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>}
-                    </td>
-                    <td style={{ padding: '8px 14px' }}>
-                      {r.error
-                        ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 9px' }}>✗ Error</span>
-                        : r.passed
-                          ? <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 5, padding: '3px 9px' }}>✓ Passed</span>
-                          : <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 9px' }}>✗ Failed</span>}
-                    </td>
-                    <td style={{ padding: '8px 14px', fontSize: 11, color: '#94a3b8', fontFamily: C.mono }}>{r.elapsed}ms</td>
-                  </tr>
+                  <>
+                    <tr key={i}
+                      onClick={() => setExpandedRow(isOpen ? null : i)}
+                      style={{ borderBottom: isOpen ? 'none' : `1px solid ${C.border}`, cursor: 'pointer', background: isOpen ? 'rgba(124,106,247,0.03)' : 'transparent' }}
+                      onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = '#f8f8fc' }}
+                      onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = 'transparent' }}>
+                      <td style={{ padding: '8px 14px', fontSize: 12, color: '#94a3b8', fontFamily: C.mono, width: 40 }}>
+                        <span style={{ marginRight: 4, fontSize: 10 }}>{isOpen ? '▾' : '▸'}</span>{r.row}
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {Object.entries(r.rowVars || {}).map(([k, v]) => (
+                            <span key={k} style={{ fontSize: 10, fontFamily: C.mono, background: 'rgba(124,106,247,0.06)', border: '1px solid rgba(124,106,247,0.15)', borderRadius: 3, padding: '1px 5px', color: C.pu }}>{k}=<b>{v}</b></span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        {r.status > 0
+                          ? <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: sc + '12', border: `1px solid ${sc}30`, borderRadius: 5, padding: '2px 8px', fontFamily: C.mono }}>{r.status} {r.statusText}</span>
+                          : <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>}
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        {r.error
+                          ? <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 9px' }}>✗ Error</span>
+                          : r.passed
+                            ? <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 5, padding: '3px 9px' }}>✓ Passed</span>
+                            : <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 5, padding: '3px 9px' }}>✗ Failed</span>}
+                      </td>
+                      <td style={{ padding: '8px 14px', fontSize: 11, color: '#94a3b8', fontFamily: C.mono }}>{r.elapsed}ms</td>
+                    </tr>
+
+                    {isOpen && (
+                      <tr key={i + '-body'}>
+                        <td colSpan={5} style={{ padding: 0, borderBottom: `1px solid ${C.border}` }}>
+                          <div style={{ background: '#f8f8fc', borderTop: `1px solid ${C.border}`, padding: '10px 16px' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Response body</div>
+                            <pre style={{ margin: 0, fontSize: 11, fontFamily: C.mono, color: '#1a1a2e', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 260, overflowY: 'auto', lineHeight: 1.6 }}>
+                              {prettyBody || (r.error ? `Error: ${r.error}` : '(empty)')}
+                            </pre>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
             </tbody>
