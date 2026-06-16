@@ -101,16 +101,33 @@ export default function InlineCsvRunner({ request, envVars, collectionVars, onCl
         </div>
       </div>
 
-      {/* Summary */}
-      {results.length > 0 && (
+      {/* Summary — CSV count always visible, results update during run */}
+      {(csvRows.length > 0 || results.length > 0) && (
         <div style={{ display: 'flex', gap: 12, padding: '6px 16px', borderBottom: `1px solid ${C.border}`, background: '#fafafa', flexShrink: 0, alignItems: 'center' }}>
-          {[['Total', results.length, '#1a1a2e'], ['Passed', passed, C.green], ['Failed', failed, C.red]].map(([l, v, c]) => (
-            <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>{l}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: c, background: c + '12', borderRadius: 5, padding: '1px 8px', fontFamily: C.mono }}>{v}</span>
-            </div>
-          ))}
-          {running && <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }}>Running {results.length}/{csvRows.length}…</span>}
+          {/* CSV total — always shown once file loaded */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 11, color: '#94a3b8' }}>CSV</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', background: '#1a1a2e12', borderRadius: 5, padding: '1px 8px', fontFamily: C.mono }}>{csvRows.length}</span>
+          </div>
+          {results.length > 0 && (
+            <>
+              <div style={{ width: 1, height: 14, background: C.border }} />
+              {[['Total', results.length, '#1a1a2e'], ['Passed', passed, C.green], ['Failed', failed, C.red]].map(([l, v, c]) => (
+                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{l}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: c, background: c + '12', borderRadius: 5, padding: '1px 8px', fontFamily: C.mono }}>{v}</span>
+                </div>
+              ))}
+            </>
+          )}
+          {running && (
+            <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }}>
+              Running {results.length}/{csvRows.length}…
+            </span>
+          )}
+          {!running && results.length > 0 && results.length === csvRows.length && (
+            <span style={{ fontSize: 11, color: C.green, marginLeft: 'auto', fontWeight: 600 }}>✓ Complete</span>
+          )}
         </div>
       )}
 
