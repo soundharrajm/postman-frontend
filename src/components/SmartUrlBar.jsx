@@ -35,14 +35,16 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
     return () => input.removeEventListener('scroll', sync)
   }, [value])
 
-  // Scroll to end when blurred so {{var}} stays visible
+  // Scroll to end when blurred
   useEffect(() => {
     const el = inputRef.current
     if (!el || focused) return
     el.scrollLeft = el.scrollWidth
   }, [value, focused])
 
-  const handleBlur = () => {
+  const handleBlur = (e) => {
+    // Don't blur if clicking inside the popover
+    if (e.relatedTarget?.closest?.('[data-urlpopover]')) return
     setFocused(false)
     const el = inputRef.current
     if (el) el.scrollLeft = el.scrollWidth
@@ -63,55 +65,16 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
       if (onPasteUrl) onPasteUrl(p)
       return
     }
-    // Has content — insert at cursor, no overwrite
   }
 
-  const hasVars = varNames.length > 0
-  // Overlay only shows when blurred — never when focused
+  const hasVars    = varNames.length > 0
+  // Overlay visible only when blurred AND has vars
   const showOverlay = hasVars && !focused
 
   return (
     <div style={{ flex: 1, position: 'relative' }}>
 
-      {/* Colour overlay — BELOW the input in z-order, only when blurred */}
-      {showOverlay && (
-        <div
-          ref={overlayRef}
-          style={{
-            position: 'absolute',
-            // Inset matches input padding exactly so text aligns
-            top: 0, bottom: 0, left: 0, right: 0,
-            padding: '10px 14px',
-            fontSize: 13, fontFamily: C.mono,
-            display: 'flex', alignItems: 'center',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            // z-index LOWER than input so input is always on top
-            zIndex: 0,
-            pointerEvents: 'none',
-            borderRadius: 8,
-          }}
-        >
-          {parts.map((p, i) =>
-            p.t === 'txt'
-              ? <span key={i} style={{ color: '#1a1a2e', whiteSpace: 'pre', flexShrink: 0 }}>{p.v}</span>
-              : <span key={i}
-                  style={{
-                    pointerEvents: 'all', cursor: 'pointer',
-                    borderRadius: 4, padding: '1px 5px', flexShrink: 0,
-                    background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
-                    border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
-                    color: resolve(p.name) ? C.green : C.red,
-                    fontSize: 12, fontWeight: 600,
-                  }}
-                  onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
-                  title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
-                  {'{{' + p.name + '}}'}
-                </span>
-          )}
-        </div>
-      )}
-
+      {/* Real input — always rendered, handles typing & cursor */}
       <input
         ref={inputRef}
         value={value}
@@ -123,10 +86,9 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
         placeholder="https://api.example.com/...  or paste cURL"
         style={{
           position: 'relative',
-          // Input always on top — overlay can never cover the cursor
           zIndex: 1,
           width: '100%',
-          background: focused ? '#fff' : (hasVars ? 'transparent' : '#fff'),
+          background: '#fff',
           border: `1.5px solid ${C.border}`,
           borderRadius: 8,
           padding: '10px 14px',
@@ -136,25 +98,82 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
           outline: 'none',
           whiteSpace: 'nowrap',
           overflowX: 'auto',
-          // Focused: real text visible + cursor blinks normally
-          // Blurred with vars: text transparent so overlay colours show through
-          color: (!focused && hasVars) ? 'transparent' : '#1a1a2e',
-          // caretColor always opaque so cursor is always visible when focused
+          // When blurred + has vars: text transparent so overlay shows through
+          // Also pass pointer events through so pill clicks reach the overlay
+          color: showOverlay ? 'transparent' : '#1a1a2e',
           caretColor: '#1a1a2e',
+          // KEY FIX: when overlay is showing, let clicks pass through the input
+          // so the pill spans underneath can receive onClick
+          pointerEvents: showOverlay ? 'none' : 'auto',
         }}
       />
 
+      {/* Invisible click-catcher to focus input when clicking on plain URL text */}
+      {showOverlay && (
+        <div
+          onClick={() => inputRef.current?.focus()}
+          style={{
+            position: 'absolute', inset: 0,
+            zIndex: 2,
+            cursor: 'text',
+            // transparent — just catches clicks on non-pill areas
+          }}
+        />
+      )}
+
+      {/* Colour overlay — always above the click-catcher, pills clickable */}
+      {showOverlay && (
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'absolute', inset: 0,
+            padding: '10px 14px',
+            fontSize: 13, fontFamily: C.mono,
+            display: 'flex', alignItems: 'center',
+            overflow: 'hidden', whiteSpace: 'nowrap',
+            zIndex: 3,
+            pointerEvents: 'none', // container doesn't intercept
+          }}
+        >
+          {parts.map((p, i) =>
+            p.t === 'txt'
+              ? <span key={i} style={{ color: '#1a1a2e', whiteSpace: 'pre', flexShrink: 0 }}>{p.v}</span>
+              : <span key={i}
+                  onClick={e => {
+                    e.stopPropagation()
+                    inputRef.current?.focus()
+                    openPop(p.name)
+                  }}
+                  style={{
+                    pointerEvents: 'all', cursor: 'pointer',
+                    borderRadius: 4, padding: '1px 5px', flexShrink: 0,
+                    background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
+                    border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
+                    color: resolve(p.name) ? C.green : C.red,
+                    fontSize: 12, fontWeight: 600,
+                  }}
+                  title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
+                  {'{{' + p.name + '}}'}
+                </span>
+          )}
+        </div>
+      )}
+
       {/* Var edit popover */}
       {popover && (
-        <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 300, background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 14, width: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+        <div data-urlpopover="1" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 300, background: '#fff', border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 14, width: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: C.pu, fontFamily: C.mono }}>{'{{' + popover + '}}'}</span>
             <button onClick={() => setPopover(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 14 }}>✕</button>
           </div>
-          <input autoFocus value={popVal} onChange={e => setPopVal(e.target.value)}
+          <input
+            autoFocus
+            value={popVal}
+            onChange={e => setPopVal(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') savePop(); if (e.key === 'Escape') setPopover(null) }}
             placeholder={`Value for ${popover}`}
-            style={{ width: '100%', background: '#f8f8fc', border: `1.5px solid ${C.border}`, borderRadius: 7, padding: '8px 10px', fontSize: 13, color: '#1a1a2e', outline: 'none', fontFamily: C.mono, boxSizing: 'border-box', marginBottom: 8 }} />
+            style={{ width: '100%', background: '#f8f8fc', border: `1.5px solid ${C.border}`, borderRadius: 7, padding: '8px 10px', fontSize: 13, color: '#1a1a2e', outline: 'none', fontFamily: C.mono, boxSizing: 'border-box', marginBottom: 8 }}
+          />
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={savePop} style={{ flex: 1, padding: '7px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: C.pu, color: '#fff' }}>Save</button>
             <button onClick={() => setPopover(null)} style={{ padding: '7px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${C.border}`, background: 'none', color: '#64748b' }}>Cancel</button>

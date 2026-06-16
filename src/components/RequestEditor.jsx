@@ -14,21 +14,30 @@ export default function RequestEditor({ request, onUpdate, onSend, loading, envV
 
   const urlWithParams = () => {
     const en = (request.params || []).filter(p => p.enabled && p.key)
-    if (!en.length) return resolve(request.url)
-    // Merge: URL params + Params tab, deduplicate by key (Params tab wins)
+
+    // First resolve vars in the raw URL
     let base = resolve(request.url)
+
+    if (!en.length) return base
+
+    // Strip any query string from the base URL so params tab is
+    // the single source of truth — avoids duplicates when the URL
+    // was pasted with ?key=value AND the Params tab has the same key
     try {
       const u = new URL(base)
-      // Remove keys that exist in Params tab to avoid duplicates
-      const tabKeys = en.map(p => p.key)
+      // Remove every key that exists in the Params tab (tab wins)
+      const tabKeys = new Set(en.map(p => p.key))
       tabKeys.forEach(k => u.searchParams.delete(k))
-      // Add Params tab values
+      // Append resolved Params tab values once
       en.forEach(p => u.searchParams.append(p.key, resolve(p.value)))
       return u.toString()
     } catch {}
-    // Fallback for non-parseable URLs
+
+    // Fallback for non-parseable URLs (e.g. with {{vars}} still in host)
     const qs = en.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(resolve(p.value))}`).join('&')
-    return `${base}${base.includes('?') ? '&' : '?'}${qs}`
+    // Strip existing query string then append
+    const baseNoQs = base.split('?')[0]
+    return `${baseNoQs}?${qs}`
   }
 
   const tabBtn = (t, label) => ({
