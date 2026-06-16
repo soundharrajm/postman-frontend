@@ -28,20 +28,19 @@ export default function IdExtractor({ onClose }) {
     const ids = [...found]
     let result = ''
 
-    const wrap = (id) => quoteIds ? `"${id}"` : id
+    // quoteIds toggle: ON = wrap in "", OFF = bare id
+    // comma is always added between items (except last)
+    const fmt = (id, last) => {
+      const v = quoteIds ? `"${id}"` : id
+      return last ? v : `${v},`
+    }
 
-    if (format === 'quoted') {
-      result = ids.map((id, i) =>
-        `"${id}"${i < ids.length - 1 ? ',' : ''}`
-      ).join('\n')
-    } else if (format === 'plain') {
-      result = ids.map((id, i) =>
-        `${wrap(id)}${i < ids.length - 1 ? ',' : ''}`
-      ).join('\n')
+    if (format === 'quoted' || format === 'plain') {
+      // one per line
+      result = ids.map((id, i) => fmt(id, i === ids.length - 1)).join('\n')
     } else if (format === 'csv') {
-      result = ids.map((id, i) =>
-        `${wrap(id)}${i < ids.length - 1 ? ',' : ''}`
-      ).join(' ')
+      // all on one line
+      result = ids.map((id, i) => fmt(id, i === ids.length - 1)).join(' ')
     }
 
     setOutput(result)
@@ -53,7 +52,7 @@ export default function IdExtractor({ onClose }) {
     setTimeout(() => setCopied(false), 5000)
   }
 
-  const fmtBtn = (f, label) => ({
+  const fmtBtn = (f) => ({
     padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'inherit',
     border:      format === f ? `1.5px solid ${C.pu}` : `1px solid ${C.border}`,
@@ -111,9 +110,9 @@ export default function IdExtractor({ onClose }) {
         {/* Footer */}
         <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Format:</span>
-          <button onClick={() => setFormat('quoted')} style={fmtBtn('quoted', 'Quoted lines')}>Quoted lines</button>
-          <button onClick={() => setFormat('plain')}  style={fmtBtn('plain',  'Plain lines')}>Plain lines</button>
-          <button onClick={() => setFormat('csv')}    style={fmtBtn('csv',    'Inline CSV')}>Inline CSV</button>
+          <button onClick={() => setFormat('quoted')} style={fmtBtn('quoted')}>Lines + comma</button>
+          <button onClick={() => setFormat('plain')}  style={fmtBtn('plain')}>Plain lines</button>
+          <button onClick={() => setFormat('csv')}    style={fmtBtn('csv')}>Inline CSV</button>
           <div style={{ width: 1, height: 16, background: C.border, margin: '0 4px' }} />
           <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>" " IDs</span>
           <div onClick={() => setQuoteIds(v => !v)} style={{ width: 32, height: 18, borderRadius: 9, background: quoteIds ? C.pu : C.border, cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
