@@ -1,6 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { C } from '../constants.jsx'
-import { parseCurl } from '../utils/helpers.js'
 
 export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVars, collectionVars, onUpdateCollectionVar }) {
   const [popover, setPopover] = useState(null)
@@ -13,7 +12,57 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
   const openPop = (name) => { setPopover(name); setPopVal(collectionVars?.[name] ?? envVars?.[name] ?? '') }
   const savePop = () => { if (popover) onUpdateCollectionVar(popover, popVal); setPopover(null) }
 
-  // Build highlighted parts
+  // ── Paste handler ──────────────────────────────────────────────────────────
+  // Only replace full URL when:
+  //   1. It's a curl command, OR
+  //   2. It's a full URL (starts with http) AND the input is currently empty
+  // Otherwise insert at cursor position so partial paths don't overwrite
+  const handlePaste = (e) => {
+    const p = e.clipboardData.getData('text').trim()
+    const isCurl    = p.startsWith('curl')
+    const isFullUrl = p.startsWith('http')
+    const isEmpty   = !value.trim()
+
+    if (isCurl) {
+      e.preventDefault()
+      if (onPasteUrl) onPasteUrl(p)
+      return
+    }
+
+    if (isFullUrl && isEmpty) {
+      // Empty bar — safe to replace with the full URL
+      e.preventDefault()
+      if (onPasteUrl) onPasteUrl(p)
+      return
+    }
+
+    if (isFullUrl && !isEmpty) {
+      // Already has content — let the browser insert at cursor position naturally
+      // This allows pasting a path segment mid-URL without overwriting
+      return
+    }
+
+    // Non-URL paste — let browser handle normally
+  }
+
+  // ── Scroll input to end when value changes (keeps {{var}} visible) ─────────
+  // This fixes the "cursor stuck mid-string on layout change" issue.
+  // We always scroll the real input to its end after each render so the
+  // visible end of the URL is always in view regardless of container width.
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el || document.activeElement === el) return
+    // Only scroll when not focused — don't disturb typing position
+    el.scrollLeft = el.scrollWidth
+  }, [value])
+
+  // On blur always scroll to end so {{var}} is visible
+  const handleBlur = () => {
+    const el = inputRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }
+
+  // Build highlighted overlay parts
   const parts = []
   let last = 0
   for (const m of value.matchAll(/\{\{(\w+)\}\}/g)) {
@@ -30,62 +79,26 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') onSend() }}
-        onPaste={e => {
-          const p = e.clipboardData.getData('text')
-          // Only intercept if pasting a full URL or curl command
-          const isCurl = p.trimStart().startsWith('curl')
-          const isFullUrl = p.trimStart().startsWith('http')
-          if (isCurl || isFullUrl) {
-            e.preventDefault()
-            if (onPasteUrl) onPasteUrl(p)
-            else onChange(p)
-          }
-          // Otherwise let browser handle normal paste (appends at cursor)
-        }}
+        onPaste={handlePaste}
+        onBlur={handleBlur}
         placeholder="https://api.example.com/...  or paste cURL"
         style={{
           width: '100%', background: '#fff', border: `1.5px solid ${C.border}`,
           borderRadius: 8, padding: '10px 14px', fontSize: 13,
+          // Text is transparent when vars exist — overlay renders the coloured version
+          // But the real input is still there and handles all cursor/selection/typing
           color: varNames.length ? 'transparent' : '#1a1a2e',
-          outline: 'none', fontFamily: C.mono, boxSizing: 'border-box', caretColor: '#1a1a2e',
-          // Direction rtl trick: keeps cursor and content end-anchored so
-          // {{var}} at the tail is always visible regardless of container width.
-          // The inner span overrides back to ltr so text reads left-to-right.
-          direction: varNames.length ? 'ltr' : 'ltr',
+          outline: 'none', fontFamily: C.mono, boxSizing: 'border-box',
+          caretColor: '#1a1a2e',
+          // overflow hidden + no wrap so the input scrolls horizontally
+          // keeping the end of the URL (where {{var}} lives) visible
+          whiteSpace: 'nowrap', overflowX: 'auto',
         }}
       />
 
-      {/* Highlighted var overlay — base text truncates left, var pills always visible at end */}
+      {/* Visual overlay — mirrors input scroll position so coloured text stays in sync */}
       {varNames.length > 0 && (
-        <div style={{
-          position: 'absolute', inset: 0, padding: '10px 14px', fontSize: 13,
-          fontFamily: C.mono, display: 'flex', alignItems: 'center',
-          overflow: 'hidden', pointerEvents: 'none',
-          // Use flex so the static base shrinks and var pills stay pinned right
-        }}>
-          {/* Base URL segment — shrinks, clips with ellipsis */}
-          <span style={{
-            color: '#1a1a2e', whiteSpace: 'pre', overflow: 'hidden',
-            textOverflow: 'ellipsis', flexShrink: 1, minWidth: 0,
-          }}>
-            {parts.filter(p => p.t === 'txt').map(p => p.v).join('')}
-          </span>
-          {/* Var pills — never shrink, always visible */}
-          {parts.filter(p => p.t === 'var').map((p, i) =>
-            <span key={i}
-              onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
-              style={{
-                pointerEvents: 'all', cursor: 'pointer', borderRadius: 4, padding: '1px 5px',
-                flexShrink: 0,
-                background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
-                border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
-                color: resolve(p.name) ? C.green : C.red, fontSize: 12, fontWeight: 600,
-              }}
-              title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
-              {'{{' + p.name + '}}'}
-            </span>
-          )}
-        </div>
+        <OverlaySync inputRef={inputRef} parts={parts} resolve={resolve} openPop={openPop} value={value} />
       )}
 
       {/* Var edit popover */}
@@ -104,6 +117,53 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
             <button onClick={() => setPopover(null)} style={{ padding: '7px 12px', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${C.border}`, background: 'none', color: '#64748b' }}>Cancel</button>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── OverlaySync ────────────────────────────────────────────────────────────
+// Syncs its scrollLeft with the real input so coloured var pills stay
+// aligned with what the user sees — even after horizontal scroll
+function OverlaySync({ inputRef, parts, resolve, openPop, value }) {
+  const overlayRef = useRef(null)
+
+  useEffect(() => {
+    const input = inputRef.current
+    const overlay = overlayRef.current
+    if (!input || !overlay) return
+
+    const sync = () => { overlay.scrollLeft = input.scrollLeft }
+    input.addEventListener('scroll', sync)
+    sync()
+    return () => input.removeEventListener('scroll', sync)
+  }, [value])
+
+  return (
+    <div
+      ref={overlayRef}
+      style={{
+        position: 'absolute', inset: 0, padding: '10px 14px', fontSize: 13,
+        fontFamily: C.mono, display: 'flex', alignItems: 'center',
+        overflow: 'hidden', pointerEvents: 'none',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {parts.map((p, i) =>
+        p.t === 'txt'
+          ? <span key={i} style={{ color: '#1a1a2e', whiteSpace: 'pre', flexShrink: 0 }}>{p.v}</span>
+          : <span key={i}
+              onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
+              style={{
+                pointerEvents: 'all', cursor: 'pointer', borderRadius: 4, padding: '1px 5px',
+                flexShrink: 0,
+                background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
+                border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
+                color: resolve(p.name) ? C.green : C.red, fontSize: 12, fontWeight: 600,
+              }}
+              title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
+              {'{{' + p.name + '}}'}
+            </span>
       )}
     </div>
   )

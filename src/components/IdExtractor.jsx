@@ -6,6 +6,7 @@ export default function IdExtractor({ onClose }) {
   const [output,  setOutput]  = useState('')
   const [copied,  setCopied]  = useState(false)
   const [format,  setFormat]  = useState('quoted') // quoted | plain | csv
+  const [quoteIds, setQuoteIds] = useState(false)
 
   const extract = () => {
     // Match UUIDs, hex IDs, alphanumeric IDs (min 6 chars)
@@ -27,15 +28,19 @@ export default function IdExtractor({ onClose }) {
     const ids = [...found]
     let result = ''
 
+    const wrap = (id) => quoteIds ? `"${id}"` : id
+
     if (format === 'quoted') {
       result = ids.map((id, i) =>
         `"${id}"${i < ids.length - 1 ? ',' : ''}`
       ).join('\n')
     } else if (format === 'plain') {
-      result = ids.join('\n')
+      result = ids.map((id, i) =>
+        `${wrap(id)}${i < ids.length - 1 ? ',' : ''}`
+      ).join('\n')
     } else if (format === 'csv') {
       result = ids.map((id, i) =>
-        `"${id}"${i < ids.length - 1 ? ',' : ''}`
+        `${wrap(id)}${i < ids.length - 1 ? ',' : ''}`
       ).join(' ')
     }
 
@@ -59,7 +64,7 @@ export default function IdExtractor({ onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 14, width: 580, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
+      <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 14, width: 780, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: `1px solid ${C.border}` }}>
@@ -97,7 +102,7 @@ export default function IdExtractor({ onClose }) {
                 </button>
               )}
             </div>
-            <pre style={{ flex: 1, margin: 0, padding: 14, fontSize: 12, fontFamily: C.mono, color: output === 'No IDs found' ? '#94a3b8' : '#1a1a2e', lineHeight: 1.8, overflowY: 'auto', whiteSpace: 'pre-wrap', background: '#fff' }}>
+            <pre style={{ flex: 1, margin: 0, padding: 14, fontSize: 12, fontFamily: C.mono, color: output === 'No IDs found' ? '#94a3b8' : '#1a1a2e', lineHeight: 1.8, overflowY: 'auto', overflowX: 'auto', whiteSpace: 'pre', background: '#fff' }}>
               {output || 'IDs will appear here...'}
             </pre>
           </div>
@@ -109,6 +114,11 @@ export default function IdExtractor({ onClose }) {
           <button onClick={() => setFormat('quoted')} style={fmtBtn('quoted', 'Quoted lines')}>Quoted lines</button>
           <button onClick={() => setFormat('plain')}  style={fmtBtn('plain',  'Plain lines')}>Plain lines</button>
           <button onClick={() => setFormat('csv')}    style={fmtBtn('csv',    'Inline CSV')}>Inline CSV</button>
+          <div style={{ width: 1, height: 16, background: C.border, margin: '0 4px' }} />
+          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>" " IDs</span>
+          <div onClick={() => setQuoteIds(v => !v)} style={{ width: 32, height: 18, borderRadius: 9, background: quoteIds ? C.pu : C.border, cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: quoteIds ? 17 : 3, transition: 'left .2s' }} />
+          </div>
           <div style={{ flex: 1 }} />
           <button onClick={extract} style={{ padding: '7px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: C.pu, color: '#fff' }}>
             Extract IDs
