@@ -5,7 +5,7 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
   const [popover,  setPopover]  = useState(null)
   const [popVal,   setPopVal]   = useState('')
   const [focused,  setFocused]  = useState(false)
-  const inputRef  = useRef(null)
+  const inputRef   = useRef(null)
   const overlayRef = useRef(null)
 
   const varNames = [...new Set([...value.matchAll(/\{\{(\w+)\}\}/g)].map(m => m[1]))]
@@ -35,7 +35,7 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
     return () => input.removeEventListener('scroll', sync)
   }, [value])
 
-  // Scroll input to end when not focused so {{var}} stays visible
+  // Scroll to end when blurred so {{var}} stays visible
   useEffect(() => {
     const el = inputRef.current
     if (!el || focused) return
@@ -48,13 +48,11 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
     if (el) el.scrollLeft = el.scrollWidth
   }
 
-  // Paste: only replace full URL when input is empty, else insert at cursor
   const handlePaste = (e) => {
     const p = e.clipboardData.getData('text').trim()
     const isCurl    = p.startsWith('curl')
     const isFullUrl = p.startsWith('http')
     const isEmpty   = !value.trim()
-
     if (isCurl) {
       e.preventDefault()
       if (onPasteUrl) onPasteUrl(p)
@@ -65,13 +63,55 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
       if (onPasteUrl) onPasteUrl(p)
       return
     }
-    // Has content — let browser insert at cursor (no overwrite)
+    // Has content — insert at cursor, no overwrite
   }
 
   const hasVars = varNames.length > 0
+  // Overlay only shows when blurred — never when focused
+  const showOverlay = hasVars && !focused
 
   return (
     <div style={{ flex: 1, position: 'relative' }}>
+
+      {/* Colour overlay — BELOW the input in z-order, only when blurred */}
+      {showOverlay && (
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'absolute',
+            // Inset matches input padding exactly so text aligns
+            top: 0, bottom: 0, left: 0, right: 0,
+            padding: '10px 14px',
+            fontSize: 13, fontFamily: C.mono,
+            display: 'flex', alignItems: 'center',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            // z-index LOWER than input so input is always on top
+            zIndex: 0,
+            pointerEvents: 'none',
+            borderRadius: 8,
+          }}
+        >
+          {parts.map((p, i) =>
+            p.t === 'txt'
+              ? <span key={i} style={{ color: '#1a1a2e', whiteSpace: 'pre', flexShrink: 0 }}>{p.v}</span>
+              : <span key={i}
+                  style={{
+                    pointerEvents: 'all', cursor: 'pointer',
+                    borderRadius: 4, padding: '1px 5px', flexShrink: 0,
+                    background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
+                    border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
+                    color: resolve(p.name) ? C.green : C.red,
+                    fontSize: 12, fontWeight: 600,
+                  }}
+                  onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
+                  title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
+                  {'{{' + p.name + '}}'}
+                </span>
+          )}
+        </div>
+      )}
+
       <input
         ref={inputRef}
         value={value}
@@ -82,8 +122,11 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
         onBlur={handleBlur}
         placeholder="https://api.example.com/...  or paste cURL"
         style={{
+          position: 'relative',
+          // Input always on top — overlay can never cover the cursor
+          zIndex: 1,
           width: '100%',
-          background: '#fff',
+          background: focused ? '#fff' : (hasVars ? 'transparent' : '#fff'),
           border: `1.5px solid ${C.border}`,
           borderRadius: 8,
           padding: '10px 14px',
@@ -93,45 +136,13 @@ export default function SmartUrlBar({ value, onChange, onPasteUrl, onSend, envVa
           outline: 'none',
           whiteSpace: 'nowrap',
           overflowX: 'auto',
-          // When focused: show real text so cursor blink is visible
-          // When blurred with vars: hide text so overlay colours show
-          color: (hasVars && !focused) ? 'transparent' : '#1a1a2e',
+          // Focused: real text visible + cursor blinks normally
+          // Blurred with vars: text transparent so overlay colours show through
+          color: (!focused && hasVars) ? 'transparent' : '#1a1a2e',
+          // caretColor always opaque so cursor is always visible when focused
           caretColor: '#1a1a2e',
         }}
       />
-
-      {/* Colour overlay — only show when NOT focused so it doesn't hide cursor */}
-      {hasVars && !focused && (
-        <div
-          ref={overlayRef}
-          style={{
-            position: 'absolute', inset: 0,
-            padding: '10px 14px',
-            fontSize: 13, fontFamily: C.mono,
-            display: 'flex', alignItems: 'center',
-            overflow: 'hidden', pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {parts.map((p, i) =>
-            p.t === 'txt'
-              ? <span key={i} style={{ color: '#1a1a2e', whiteSpace: 'pre', flexShrink: 0 }}>{p.v}</span>
-              : <span key={i}
-                  onClick={e => { e.stopPropagation(); inputRef.current?.focus(); openPop(p.name) }}
-                  style={{
-                    pointerEvents: 'all', cursor: 'pointer',
-                    borderRadius: 4, padding: '1px 5px', flexShrink: 0,
-                    background: resolve(p.name) ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.1)',
-                    border: `1px solid ${resolve(p.name) ? 'rgba(22,163,74,0.35)' : 'rgba(220,38,38,0.3)'}`,
-                    color: resolve(p.name) ? C.green : C.red,
-                    fontSize: 12, fontWeight: 600,
-                  }}
-                  title={resolve(p.name) ? `= ${resolve(p.name)}` : 'Click to set value'}>
-                  {'{{' + p.name + '}}'}
-                </span>
-          )}
-        </div>
-      )}
 
       {/* Var edit popover */}
       {popover && (
