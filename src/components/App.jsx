@@ -267,7 +267,7 @@ export default function App() {
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, color: '#cbd5e1' }}>
             <div style={{ fontSize: 64 }}>⚡</div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: '#94a3b8' }}>APIforge</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: '#94a3b8' }}>API Market</h2>
             <p style={{ fontSize: 13, color: '#cbd5e1' }}>Create or select a request to get started</p>
             <button onClick={() => newReq(null)} style={{ padding: '10px 24px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: C.pu, color: '#fff' }}>+ New Request</button>
           </div>
