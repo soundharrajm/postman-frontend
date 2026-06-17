@@ -12,6 +12,7 @@ import EnvPanel         from './components/EnvPanel.jsx'
 import BackendSettings  from './components/BackendSettings.jsx'
 import ResizablePanes  from './components/ResizablePanes.jsx'
 import IdExtractor    from './components/IdExtractor.jsx'
+import HealthPanel    from './components/HealthPanel.jsx'
 
 export default function App() {
   // ── State ──────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ export default function App() {
   const [showEnv,     setShowEnv]     = useState(false)
   const [showHist,    setShowHist]    = useState(false)
   const [showBackend, setShowBackend] = useState(false)
+  const [showHealth,  setShowHealth]  = useState(false)
   const [runnerCol,   setRunnerCol]   = useState(null)
   const [csvRunReq,   setCsvRunReq]   = useState(null)
   const [importError, setImportError] = useState(null)
@@ -204,6 +206,10 @@ export default function App() {
         <button onClick={() => setShowEnv(true)} title="Environments" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid rgba(124,106,247,0.25)`, background: 'rgba(124,106,247,0.06)', color: C.pu, cursor: 'pointer', fontFamily: 'inherit' }}>⚙ Env</button>
         <button onClick={() => setShowIdTool(true)} title="ID Extractor" style={{ fontSize: 13, padding: '5px 9px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer' }}>🔑</button>
         <button onClick={() => setShowHist(true)} title="History" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid ${C.border}`, background: '#f8f8fc', color: '#64748b', cursor: 'pointer', fontFamily: 'inherit' }}>🕐</button>
+        <button onClick={() => setShowHealth(true)} title="Health" style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: `1px solid ${backendOk === true ? 'rgba(22,163,74,0.3)' : backendOk === false ? 'rgba(220,38,38,0.3)' : C.border}`, background: backendOk === true ? 'rgba(22,163,74,0.06)' : backendOk === false ? 'rgba(220,38,38,0.06)' : '#f8f8fc', color: backendOk === true ? C.green : backendOk === false ? C.red : '#64748b', cursor: 'pointer', fontFamily: 'inherit', display:'inline-flex', alignItems:'center', gap:5 }}>
+          <span style={{ width:6, height:6, borderRadius:'50%', background: backendOk === true ? C.green : backendOk === false ? C.red : '#94a3b8', display:'inline-block' }} />
+          Health
+        </button>
         <button onClick={() => {
           const data = { collections, history, envs, exportedAt: new Date().toISOString() }
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -303,6 +309,7 @@ export default function App() {
       )}
 
       {showIdTool && <IdExtractor onClose={() => setShowIdTool(false)} />}
+      {showHealth  && <HealthPanel onClose={() => setShowHealth(false)} />}
 
       {runnerCol && (
         <CollectionRunner
